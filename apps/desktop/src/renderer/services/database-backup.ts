@@ -1,4 +1,4 @@
-import type { PromptVersion, RuleBackupRecord } from "@prompthub/shared/types";
+import type { PromptVersion } from "@prompthub/shared/types";
 import type {
   Skill,
   SkillFileSnapshot,
@@ -40,35 +40,6 @@ import {
   restoreSettingsStateSnapshot,
 } from "./settings-snapshot";
 
-async function collectRuleData(): Promise<RuleBackupRecord[]> {
-  const rulesApi = window.api?.rules;
-  if (!rulesApi?.list || !rulesApi?.read) {
-    return [];
-  }
-
-  const files = await rulesApi.list();
-  return Promise.all(
-    files.map(async (file) => {
-      const full = await rulesApi.read(file.id);
-      return {
-        id: full.id,
-        platformId: full.platformId,
-        platformName: full.platformName,
-        platformIcon: full.platformIcon,
-        platformDescription: full.platformDescription,
-        name: full.name,
-        description: full.description,
-        path: full.path,
-        managedPath: full.managedPath,
-        targetPath: full.targetPath,
-        projectRootPath: full.projectRootPath ?? null,
-        syncStatus: full.syncStatus,
-        content: full.content,
-        versions: full.versions,
-      } satisfies RuleBackupRecord;
-    }),
-  );
-}
 const DB_VERSION = DB_BACKUP_VERSION;
 const VERSION_STORE = "versions";
 const IMAGE_BATCH_SIZE = 10;
@@ -509,13 +480,12 @@ export async function exportDatabase(options?: {
       }
     : undefined;
 
-  const [images, videos, skillData, ruleData] = await Promise.all([
+  const [images, videos, skillData] = await Promise.all([
     collectImages(prompts, imageLimits),
     options?.skipVideoContent
       ? Promise.resolve(undefined)
       : collectVideos(prompts, videoLimits),
     collectSkillData(),
-    collectRuleData(),
   ]);
 
   const settingsSnapshot = getSettingsStateSnapshot({
@@ -533,7 +503,6 @@ export async function exportDatabase(options?: {
     aiConfig: getAiConfigSnapshot({ includeRootApiKey: true }),
     settings: settingsSnapshot ? { state: settingsSnapshot.state } : undefined,
     settingsUpdatedAt: settingsSnapshot?.settingsUpdatedAt,
-    rules: ruleData.length > 0 ? ruleData : undefined,
     skills: skillData.skills.length > 0 ? skillData.skills : undefined,
     skillVersions:
       skillData.skillVersions.length > 0 ? skillData.skillVersions : undefined,
@@ -628,17 +597,6 @@ export async function importDatabase(backup: DatabaseBackup): Promise<void> {
 
   if (normalizedBackup.settings) {
     restoreSettingsStateSnapshot(normalizedBackup.settings);
-  }
-
-  if (normalizedBackup.rules && normalizedBackup.rules.length > 0) {
-    try {
-      await window.api?.rules?.importRecords?.(normalizedBackup.rules, {
-        replace: true,
-      });
-    } catch (error) {
-      restoreFailures.push("rules restore");
-      console.warn("Failed to restore rules:", error);
-    }
   }
 
   try {
@@ -806,7 +764,7 @@ export async function downloadSelectiveExport(
     videos: !!scope.videos,
     aiConfig: !!scope.aiConfig,
     settings: !!scope.settings,
-    rules: !!scope.rules,
+    rules: false,
     skills: !!scope.skills,
   };
 
@@ -825,7 +783,6 @@ export async function downloadSelectiveExport(
     aiConfig: normalized.aiConfig ? fullBackup.aiConfig : undefined,
     settings: normalized.settings ? fullBackup.settings : undefined,
     settingsUpdatedAt: normalized.settings ? fullBackup.settingsUpdatedAt : undefined,
-    rules: normalized.rules ? fullBackup.rules : undefined,
     skills: normalized.skills ? fullBackup.skills : undefined,
     skillVersions: normalized.skills ? fullBackup.skillVersions : undefined,
     skillFiles: normalized.skills ? fullBackup.skillFiles : undefined,
@@ -862,7 +819,6 @@ export async function downloadSelectiveExport(
         images: normalized.images,
         videos: normalized.videos,
         skills: normalized.skills,
-        rules: normalized.rules,
         config: false,
         aiConfigJson,
         settingsJson,

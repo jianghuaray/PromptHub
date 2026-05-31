@@ -105,14 +105,13 @@ function detectDesktopPlatform(userAgent: string): string {
 
 async function buildDesktopHeartbeatPayload(): Promise<DeviceHeartbeatPayload> {
   const userAgent = navigator.userAgent;
-  const appVersion = await window.electron?.updater?.getVersion?.();
   return {
     id: getOrCreateDesktopDeviceId(),
     type: "desktop",
     name: "PromptHub Desktop",
     platform: detectDesktopPlatform(userAgent),
-    appVersion: typeof appVersion === "string" ? appVersion : undefined,
-    clientVersion: typeof appVersion === "string" ? appVersion : undefined,
+    appVersion: undefined,
+    clientVersion: undefined,
     userAgent,
   };
 }

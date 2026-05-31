@@ -5,17 +5,12 @@ import {
   FolderPlusIcon,
   SunIcon,
   MoonIcon,
-  DownloadIcon,
   XIcon,
   ChevronUpIcon,
   ChevronDownIcon,
-  SparklesIcon,
-  Wand2Icon,
   GlobeIcon,
   LogOutIcon,
 } from "lucide-react";
-import { clsx } from "clsx";
-import { UpdateStatus } from "../UpdateDialog";
 import { usePromptStore } from "../../stores/prompt.store";
 import { useSettingsStore } from "../../stores/settings.store";
 import { useFolderStore } from "../../stores/folder.store";
@@ -30,10 +25,8 @@ import {
   lazy,
   Suspense,
 } from "react";
-import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { useUIStore } from "../../stores/ui.store";
-import { useRulesStore } from "../../stores/rules.store";
 import { collectPrivateFolderScopeIds } from "../../services/prompt-filter";
 import {
   filterVisibleScannedSkills,
@@ -41,8 +34,6 @@ import {
 } from "../../services/skill-filter";
 import { filterRegistrySkills } from "../../services/skill-store-search";
 import {
-  getRuntimeCapabilities,
-  getWebContext,
   isWebRuntime,
   logoutWebSession,
 } from "../../runtime";
@@ -50,11 +41,6 @@ import {
 const CreatePromptModal = lazy(() =>
   import("../prompt/CreatePromptModal").then((module) => ({
     default: module.CreatePromptModal,
-  })),
-);
-const QuickAddModal = lazy(() =>
-  import("../prompt/QuickAddModal").then((module) => ({
-    default: module.QuickAddModal,
   })),
 );
 const CreateSkillModal = lazy(() =>
@@ -67,15 +53,9 @@ const OPEN_CREATE_SKILL_PROJECT_MODAL_EVENT = "open-create-skill-project-modal";
 
 interface TopBarProps {
   onOpenSettings: () => void;
-  updateAvailable?: UpdateStatus | null;
-  onShowUpdateDialog?: () => void;
 }
 
-export function TopBar({
-  onOpenSettings,
-  updateAvailable,
-  onShowUpdateDialog,
-}: TopBarProps) {
+export function TopBar(_props: TopBarProps) {
   const { t } = useTranslation();
   // Prompt store
   const promptSearchQuery = usePromptStore((state) => state.searchQuery);
@@ -109,44 +89,22 @@ export function TopBar({
 
   const isDarkMode = useSettingsStore((state) => state.isDarkMode);
   const setDarkMode = useSettingsStore((state) => state.setDarkMode);
-  const aiModels = useSettingsStore((state) => state.aiModels);
-  const aiApiKey = useSettingsStore((state) => state.aiApiKey);
-  const creationMode = useSettingsStore((state) => state.creationMode);
   const selectedFolderId = useFolderStore((state) => state.selectedFolderId);
   const folders = useFolderStore((state) => state.folders);
   const promptTypeFilter = usePromptStore((state) => state.promptTypeFilter);
   const appModule = useUIStore((state) => state.appModule);
-  const rulesSearchQuery = useRulesStore((state) => state.searchQuery);
-  const setRulesSearchQuery = useRulesStore((state) => state.setSearchQuery);
-  const ruleFiles = useRulesStore((state) => state.files);
-  const selectRule = useRulesStore((state) => state.selectRule);
   const isSidebarCollapsed = useUIStore((state) => state.isSidebarCollapsed);
   const setSidebarCollapsed = useUIStore((state) => state.setSidebarCollapsed);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
-  const [quickAddInitialMode, setQuickAddInitialMode] = useState<
-    "analyze" | "generate"
-  >("analyze");
   const [isCreateSkillModalOpen, setIsCreateSkillModalOpen] = useState(false);
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const createMenuRef = useRef<HTMLDivElement>(null);
-  const createMenuDropdownRef = useRef<HTMLDivElement>(null);
   const [currentResultIndex, setCurrentResultIndex] = useState(0);
-  const [createMenuPosition, setCreateMenuPosition] = useState({
-    top: 0,
-    right: 0,
-  });
-  const [webContext, setWebContext] = useState<PromptHubWebContext | undefined>(
-    () => getWebContext(),
-  );
   const webRuntime = isWebRuntime();
-  const runtimeCapabilities = getRuntimeCapabilities();
   const isProjectSkillView =
     appModule === "skill" && skillStoreView === "projects";
   const isSkillStoreCatalogView =
     appModule === "skill" && skillStoreView === "store";
-  const isRulesView = appModule === "rules";
   const isSkillView = appModule === "skill";
   const isPromptView = appModule === "prompt";
 
@@ -157,9 +115,7 @@ export function TopBar({
       : skillSearchQuery
     : isPromptView
       ? promptSearchQuery
-      : isRulesView
-        ? rulesSearchQuery
-        : "";
+      : "";
   const deferredSkillSearchQuery = useDeferredValue(
     isSkillStoreCatalogView ? skillStoreSearchQuery : skillSearchQuery,
   );
@@ -169,13 +125,7 @@ export function TopBar({
       : setSkillSearchQuery
     : isPromptView
       ? setPromptSearchQuery
-      : isRulesView
-        ? setRulesSearchQuery
-        : () => undefined;
-
-  // Check if AI is configured
-  const hasAiConfig =
-    aiModels.length > 0 || (aiApiKey && aiApiKey.trim() !== "");
+      : () => undefined;
 
   // 计算 Prompt 搜索结果（与 MainContent 保持一致的逻辑）
   const promptSearchResults = useMemo(() => {
@@ -313,35 +263,9 @@ export function TopBar({
     skillStoreCategory,
   ]);
 
-  const ruleSearchResults = useMemo(() => {
-    if (!isRulesView) return [];
-
-    const query = rulesSearchQuery.trim().toLowerCase();
-    if (!query) {
-      return ruleFiles;
-    }
-
-    return ruleFiles.filter((file) => {
-      const haystack = [
-        file.platformName,
-        file.platformDescription,
-        file.name,
-        file.description,
-        file.path,
-        file.projectRootPath || "",
-      ]
-        .join(" ")
-        .toLowerCase();
-
-      return haystack.includes(query);
-    });
-  }, [isRulesView, ruleFiles, rulesSearchQuery]);
-
   // 根据模式选择搜索结果
   const searchResults =
-    isRulesView
-      ? ruleSearchResults
-      : isSkillView
+    isSkillView
         ? isProjectSkillView
           ? projectSearchResults
           : isSkillStoreCatalogView
@@ -350,18 +274,6 @@ export function TopBar({
       : promptSearchResults;
   const searchResultCount = searchResults.length;
   const showSearchNavigation = !isSkillView && !isProjectSkillView;
-
-  const updateCreateMenuPosition = useCallback(() => {
-    if (!createMenuRef.current) {
-      return;
-    }
-
-    const rect = createMenuRef.current.getBoundingClientRect();
-    setCreateMenuPosition({
-      top: rect.bottom + 4,
-      right: Math.max(window.innerWidth - rect.right, 8),
-    });
-  }, []);
 
   // 导航到上一个/下一个结果
   const navigateResult = useCallback(
@@ -392,11 +304,6 @@ export function TopBar({
         if (skillResults[newIndex]) {
           selectSkill(skillResults[newIndex].id);
         }
-      } else if (isRulesView) {
-        const ruleResults = ruleSearchResults;
-        if (ruleResults[newIndex]) {
-          void selectRule(ruleResults[newIndex].id);
-        }
       } else {
         const promptResults = promptSearchResults;
         if (promptResults[newIndex]) {
@@ -405,38 +312,25 @@ export function TopBar({
       }
     },
     [
-        searchResultCount,
-        currentResultIndex,
-        isRulesView,
-        isProjectSkillView,
-        isSkillStoreCatalogView,
-        isSkillView,
-        selectRule,
-        selectPrompt,
-        selectRegistrySkill,
-        selectSkill,
-        ruleSearchResults,
-        storeSearchResults,
-        skillSearchResults,
-        promptSearchResults,
-      ],
+      searchResultCount,
+      currentResultIndex,
+      isProjectSkillView,
+      isSkillStoreCatalogView,
+      isSkillView,
+      selectPrompt,
+      selectRegistrySkill,
+      selectSkill,
+      storeSearchResults,
+      skillSearchResults,
+      promptSearchResults,
+    ],
   );
 
   // 当搜索查询变化时重置索引。
-  // Prompt / Rules 继续自动定位首个结果，Skills 只更新结果计数，不强制改选中项。
+  // Prompt 继续自动定位首个结果，Skills 只更新结果计数，不强制改选中项。
   useEffect(() => {
     setCurrentResultIndex(0);
     if (searchQuery.trim().length === 0) {
-      if (isRulesView && ruleSearchResults.length > 0) {
-        void selectRule(ruleSearchResults[0].id);
-      }
-      return;
-    }
-
-    if (isRulesView) {
-      if (ruleSearchResults.length > 0) {
-        void selectRule(ruleSearchResults[0].id);
-      }
       return;
     }
 
@@ -448,16 +342,10 @@ export function TopBar({
       selectPrompt(promptSearchResults[0].id);
     }
   }, [
-    isRulesView,
-    isProjectSkillView,
     isSkillView,
     promptSearchResults,
-    ruleSearchResults,
     searchQuery,
-    selectRule,
     selectPrompt,
-    selectSkill,
-    skillSearchResults,
   ]);
 
   // 处理键盘事件
@@ -489,10 +377,6 @@ export function TopBar({
         } else if (skillSearchResults[currentResultIndex]) {
           selectSkill(skillSearchResults[currentResultIndex].id);
         }
-      } else if (isRulesView) {
-        if (ruleSearchResults[currentResultIndex]) {
-          void selectRule(ruleSearchResults[currentResultIndex].id);
-        }
       } else {
         if (promptSearchResults[currentResultIndex]) {
           selectPrompt(promptSearchResults[currentResultIndex].id);
@@ -520,73 +404,21 @@ export function TopBar({
     };
   }, []);
 
-  // Click outside to close create menu
+  // Listen for modal open events.
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      const target = event.target as Node;
-      const clickedTrigger = createMenuRef.current?.contains(target) ?? false;
-      const clickedDropdown =
-        createMenuDropdownRef.current?.contains(target) ?? false;
-
-      if (
-        !clickedTrigger &&
-        !clickedDropdown
-      ) {
-        setIsCreateMenuOpen(false);
-      }
-    }
-
-    // Listen for open-create-skill-modal event
     function handleOpenSkillModal() {
       setIsCreateSkillModalOpen(true);
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("open-create-skill-modal", handleOpenSkillModal);
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener(
         "open-create-skill-modal",
         handleOpenSkillModal,
       );
     };
   }, []);
-
-  useEffect(() => {
-    if (!isCreateMenuOpen) {
-      return;
-    }
-
-    updateCreateMenuPosition();
-
-    const handleLayoutChange = () => {
-      updateCreateMenuPosition();
-    };
-
-    window.addEventListener("resize", handleLayoutChange);
-    window.addEventListener("scroll", handleLayoutChange, true);
-
-    return () => {
-      window.removeEventListener("resize", handleLayoutChange);
-      window.removeEventListener("scroll", handleLayoutChange, true);
-    };
-  }, [isCreateMenuOpen, updateCreateMenuPosition]);
-
-  useEffect(() => {
-    if (!webRuntime) {
-      return;
-    }
-
-    const syncContext = () => {
-      setWebContext(getWebContext());
-    };
-
-    window.addEventListener("prompthub:web-context-changed", syncContext);
-    return () => {
-      window.removeEventListener("prompthub:web-context-changed", syncContext);
-    };
-  }, [webRuntime]);
 
   const handleCreatePrompt = async (data: {
     title: string;
@@ -686,9 +518,7 @@ export function TopBar({
                       : isSkillStoreCatalogView
                         ? t("skill.searchStore", "Search skills...")
                       : t("header.searchSkill", "Search skills...")
-                    : isRulesView
-                      ? t("rules.searchPlaceholder", "Search rule files...")
-                      : t("header.search")
+                    : t("header.search")
                 }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -748,31 +578,8 @@ export function TopBar({
 
         {/* 右侧操作按钮 - 只有按钮本身不可拖动 */}
         <div className="flex items-center gap-1 ml-4">
-          {/* 更新提示 */}
-          {runtimeCapabilities.appUpdate &&
-            updateAvailable &&
-            updateAvailable.status === "available" && (
-            <>
-              <button
-                onClick={onShowUpdateDialog}
-                className="flex items-center gap-1.5 h-8 px-3 rounded-lg border border-dashed border-primary/50 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
-                style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-                title={t("settings.updateAvailable")}
-              >
-                <DownloadIcon className="w-4 h-4" />
-                <span className="hidden sm:inline">
-                  {t("settings.newVersion", {
-                    version: updateAvailable.info?.version,
-                  })}
-                </span>
-              </button>
-              <div className="w-px h-5 bg-border mx-1" />
-            </>
-          )}
-
-          {/* Split Button for New Prompt / New Skill */}
-          {!isRulesView && (
-            <div
+          {/* New Prompt / New Skill */}
+          <div
               ref={createMenuRef}
               className="flex items-center rounded-lg bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all ml-4 relative h-8"
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
@@ -788,19 +595,10 @@ export function TopBar({
                       setIsCreateSkillModalOpen(true);
                     }
                   } else {
-                    const mode = useSettingsStore.getState().creationMode;
-                    if (mode === "manual") setIsCreateModalOpen(true);
-                    else {
-                      setQuickAddInitialMode("analyze");
-                      setIsQuickAddModalOpen(true);
-                    }
+                    setIsCreateModalOpen(true);
                   }
                 }}
-                className={`flex items-center gap-1.5 h-full text-sm font-medium active:scale-press-in transition-transform ${
-                  appModule === "prompt"
-                    ? "pl-3 pr-2 border-r border-primary-foreground/20"
-                    : "px-3"
-                }`}
+                className="flex items-center gap-1.5 h-full px-3 text-sm font-medium active:scale-press-in transition-transform"
               >
                 {appModule === "skill" ? (
                   isProjectSkillView ? (
@@ -808,123 +606,18 @@ export function TopBar({
                   ) : (
                     <PlusIcon className="w-4 h-4" />
                   )
-                ) : creationMode === "manual" ? (
-                  <PlusIcon className="w-4 h-4" />
                 ) : (
-                  <SparklesIcon className="w-4 h-4" />
+                  <PlusIcon className="w-4 h-4" />
                 )}
                 <span>
                   {appModule === "skill"
                     ? isProjectSkillView
                       ? t("skill.addProject", "Add Project")
                       : t("header.new")
-                    : creationMode === "manual"
-                      ? t("header.new")
-                      : t("quickAdd.title")}
+                    : t("header.new")}
                 </span>
               </button>
-
-              {appModule === "prompt" && (
-              <>
-                <button
-                  onClick={() => {
-                    if (!isCreateMenuOpen) {
-                      updateCreateMenuPosition();
-                    }
-                    setIsCreateMenuOpen(!isCreateMenuOpen);
-                  }}
-                  aria-haspopup="menu"
-                  aria-expanded={isCreateMenuOpen}
-                  className="flex items-center justify-center h-full px-1.5 hover:bg-black/10 transition-colors rounded-r-lg"
-                >
-                  <ChevronDownIcon className="w-3.5 h-3.5" />
-                </button>
-
-                {isCreateMenuOpen &&
-                  typeof document !== "undefined" &&
-                  createPortal(
-                    <div
-                      ref={createMenuDropdownRef}
-                      role="menu"
-                      className="fixed mt-1 w-48 rounded-lg border border-border app-wallpaper-panel-strong p-1 z-[9999] animate-in fade-in zoom-in-95 duration-instant"
-                      style={{
-                        top: createMenuPosition.top,
-                        right: createMenuPosition.right,
-                        WebkitAppRegion: "no-drag",
-                      } as React.CSSProperties}
-                    >
-                      <button
-                        onClick={() => {
-                          useSettingsStore.getState().setCreationMode("manual");
-                          setIsCreateMenuOpen(false);
-                        }}
-                        className={clsx(
-                          "flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent text-left transition-colors rounded-md",
-                          creationMode === "manual" && "bg-accent",
-                        )}
-                      >
-                        <PlusIcon className="w-4 h-4 text-muted-foreground" />
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-medium">{t("header.new")}</span>
-                          <span className="text-[10px] text-muted-foreground leading-none">
-                            {t("quickAdd.manualAddDesc")}
-                          </span>
-                        </div>
-                        {creationMode === "manual" && (
-                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                        )}
-                      </button>
-                      <div className="h-px bg-border my-1 mx-2 opacity-50" />
-                      <button
-                        onClick={() => {
-                          useSettingsStore.getState().setCreationMode("quick");
-                          setIsCreateMenuOpen(false);
-                        }}
-                        className={clsx(
-                          "flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent text-left transition-colors rounded-md",
-                          creationMode === "quick" && "bg-accent",
-                        )}
-                      >
-                        <SparklesIcon className="w-4 h-4 text-primary" />
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-medium">
-                            {t("quickAdd.title")}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground leading-none">
-                            {t("quickAdd.desc")}
-                          </span>
-                        </div>
-                        {creationMode === "quick" && (
-                          <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
-                        )}
-                      </button>
-                      <div className="h-px bg-border my-1 mx-2 opacity-50" />
-                      <button
-                        onClick={() => {
-                          useSettingsStore.getState().setCreationMode("quick");
-                          setQuickAddInitialMode("generate");
-                          setIsQuickAddModalOpen(true);
-                          setIsCreateMenuOpen(false);
-                        }}
-                        className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent text-left transition-colors rounded-md"
-                      >
-                        <Wand2Icon className="w-4 h-4 text-primary" />
-                        <div className="flex flex-col items-start gap-0.5">
-                          <span className="font-medium">
-                            {t("quickAdd.generateEntry")}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground leading-none">
-                            {t("quickAdd.generateEntryDesc")}
-                          </span>
-                        </div>
-                      </button>
-                    </div>,
-                    document.body,
-                  )}
-              </>
-              )}
-            </div>
-          )}
+          </div>
 
           {/* 主题切换 */}
           <button
@@ -961,15 +654,6 @@ export function TopBar({
           onCreate={handleCreatePrompt}
           defaultFolderId={selectedFolderId || undefined}
           defaultPromptType={promptTypeFilter === "image" ? "image" : "text"}
-        />
-
-        {/* 快速添加弹窗 */}
-        <QuickAddModal
-          isOpen={isQuickAddModalOpen}
-          onClose={() => setIsQuickAddModalOpen(false)}
-          onCreate={handleCreatePrompt}
-          defaultPromptType={promptTypeFilter === "image" ? "image" : "text"}
-          initialMode={quickAddInitialMode}
         />
 
         {/* 新建 Skill 弹窗 */}

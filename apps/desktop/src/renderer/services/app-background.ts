@@ -45,15 +45,6 @@ export function hasValidWebDAVConfig(settings: WebDAVSyncSettings): boolean {
   );
 }
 
-export function shouldRunBackgroundUpdateCheck(
-  autoCheckUpdate: boolean,
-  state: BackgroundTaskState,
-): boolean {
-  return Boolean(
-    autoCheckUpdate && state.isVisible && state.isOnline && !state.isRunning,
-  );
-}
-
 export function shouldRunStartupWebDAVSync(
   settings: WebDAVSyncSettings,
   state: BackgroundTaskState,

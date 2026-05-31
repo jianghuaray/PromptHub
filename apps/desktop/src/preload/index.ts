@@ -1,19 +1,14 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { IPC_CHANNELS } from "@prompthub/shared/constants/ipc-channels";
 import { aiApi } from "./api/ai";
-import { cliApi } from "./api/cli";
 import { folderApi } from "./api/folder";
 import { ioApi } from "./api/io";
 import { promptApi } from "./api/prompt";
-import { rulesApi } from "./api/rules";
 import { settingsApi } from "./api/settings";
 import { skillApi } from "./api/skill";
 import { upgradeBackupApi } from "./api/upgrade-backup";
 import { versionApi } from "./api/version";
 import type {
-  CliInstallMethod,
-  CliInstallResult,
-  CliStatus,
   CreatePromptDTO,
   UpdatePromptDTO,
   SearchQuery,
@@ -104,11 +99,9 @@ const api = {
 
   skill: skillApi,
   settings: settingsApi,
-  rules: rulesApi,
   upgradeBackup: upgradeBackupApi,
   io: ioApi,
   ai: aiApi,
-  cli: cliApi,
 
   // Listen to main process events (with whitelist)
   // 监听主进程事件（使用白名单）
@@ -116,7 +109,6 @@ const api = {
     // Whitelist of allowed channels to listen
     // 允许监听的通道白名单
     const ALLOWED_LISTEN_CHANNELS = [
-      "updater:status",
       "shortcut:triggered",
       "window:close-action",
       "window:showCloseDialog",
@@ -171,7 +163,6 @@ contextBridge.exposeInMainWorld("electron", {
       dataDir: string;
       databasePath: string;
       promptsDir: string;
-      rulesDir: string;
       skillsDir: string;
       backupsDir: string;
       logsDir: string;
@@ -237,41 +228,6 @@ contextBridge.exposeInMainWorld("electron", {
       exportJson?: string;
     };
   }) => ipcRenderer.invoke("data:exportZip", params),
-  // Updater
-  // 更新器
-  updater: {
-    check: (options?: boolean | { useMirror?: boolean; channel?: "stable" | "preview" }) =>
-      ipcRenderer.invoke("updater:check", options),
-    download: (options?: boolean | { useMirror?: boolean; channel?: "stable" | "preview" }) =>
-      ipcRenderer.invoke("updater:download", options),
-    install: () => ipcRenderer.invoke("updater:install"),
-    getInstallSource: () => ipcRenderer.invoke("updater:installSource"),
-    openDownloadedUpdate: () =>
-      ipcRenderer.invoke("updater:openDownloadedUpdate"),
-    getVersion: () => ipcRenderer.invoke("updater:version"),
-    getPlatform: () => ipcRenderer.invoke("updater:platform"),
-    openReleases: () => ipcRenderer.invoke("updater:openReleases"),
-    onStatus: (callback: (status: any) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, status: any) =>
-        callback(status);
-      ipcRenderer.on("updater:status", listener);
-      // Return unsubscribe function to allow precise cleanup (do NOT removeAllListeners)
-      // 返回取消订阅函数，允许精确清理（不要 removeAllListeners）
-      return () => {
-        ipcRenderer.removeListener("updater:status", listener);
-      };
-    },
-    offStatus: () => {
-      // Backward compatible: remove all listeners
-      // 兼容旧用法：移除所有监听
-      ipcRenderer.removeAllListeners("updater:status");
-    },
-  },
-  cli: {
-    getStatus: () => ipcRenderer.invoke(IPC_CHANNELS.CLI_STATUS) as Promise<CliStatus>,
-    install: (method?: CliInstallMethod) =>
-      ipcRenderer.invoke(IPC_CHANNELS.CLI_INSTALL, method) as Promise<CliInstallResult>,
-  },
   // Images
   // 图片
   selectImage: () => ipcRenderer.invoke("dialog:selectImage"),
@@ -303,72 +259,6 @@ contextBridge.exposeInMainWorld("electron", {
   imageExists: (fileName: string) =>
     ipcRenderer.invoke("image:exists", fileName),
   clearImages: () => ipcRenderer.invoke("image:clear"),
-  // WebDAV (bypass CORS via main process)
-  // WebDAV（通过主进程绕过 CORS）
-  webdav: {
-    testConnection: (config: {
-      url: string;
-      username: string;
-      password: string;
-    }) => ipcRenderer.invoke("webdav:testConnection", config),
-    ensureDirectory: (
-      url: string,
-      config: { url: string; username: string; password: string },
-    ) => ipcRenderer.invoke("webdav:ensureDirectory", url, config),
-    upload: (
-      fileUrl: string,
-      config: { url: string; username: string; password: string },
-      data: string,
-    ) => ipcRenderer.invoke("webdav:upload", fileUrl, config, data),
-    download: (
-      fileUrl: string,
-      config: { url: string; username: string; password: string },
-    ) => ipcRenderer.invoke("webdav:download", fileUrl, config),
-    stat: (
-      fileUrl: string,
-      config: { url: string; username: string; password: string },
-    ) => ipcRenderer.invoke("webdav:stat", fileUrl, config),
-  },
-  s3: {
-    testConnection: (config: {
-      endpoint: string;
-      region: string;
-      bucket: string;
-      accessKeyId: string;
-      secretAccessKey: string;
-    }) => ipcRenderer.invoke(IPC_CHANNELS.S3_TEST_CONNECTION, config),
-    upload: (
-      key: string,
-      config: {
-        endpoint: string;
-        region: string;
-        bucket: string;
-        accessKeyId: string;
-        secretAccessKey: string;
-      },
-      data: string,
-    ) => ipcRenderer.invoke(IPC_CHANNELS.S3_UPLOAD, key, config, data),
-    download: (
-      key: string,
-      config: {
-        endpoint: string;
-        region: string;
-        bucket: string;
-        accessKeyId: string;
-        secretAccessKey: string;
-      },
-    ) => ipcRenderer.invoke(IPC_CHANNELS.S3_DOWNLOAD, key, config),
-    stat: (
-      key: string,
-      config: {
-        endpoint: string;
-        region: string;
-        bucket: string;
-        accessKeyId: string;
-        secretAccessKey: string;
-      },
-    ) => ipcRenderer.invoke(IPC_CHANNELS.S3_STAT, key, config),
-  },
   e2e: {
     getStats: () => ipcRenderer.invoke("e2e:getStats"),
     resetStats: () => ipcRenderer.invoke("e2e:resetStats"),
@@ -453,7 +343,6 @@ declare global {
         dataDir: string;
         databasePath: string;
         promptsDir: string;
-        rulesDir: string;
         skillsDir: string;
         backupsDir: string;
         logsDir: string;
@@ -515,37 +404,6 @@ declare global {
           exportJson?: string;
         };
       }) => Promise<{ canceled: boolean; filePath?: string; error?: string }>;
-      updater?: {
-        check: (
-          options?: boolean | { useMirror?: boolean; channel?: "stable" | "preview" },
-        ) => Promise<{ success: boolean; result?: any; error?: string }>;
-        download: (
-          options?: boolean | { useMirror?: boolean; channel?: "stable" | "preview" },
-        ) => Promise<{ success: boolean; error?: string }>;
-        install: () => Promise<
-          | {
-              success: boolean;
-              manual?: boolean;
-              backupPath?: string;
-              error?: string;
-            }
-          | void
-        >;
-        openDownloadedUpdate: () => Promise<{
-          success: boolean;
-          path?: string;
-        }>;
-        getInstallSource: () => Promise<"direct" | "homebrew" | "unknown">;
-        getVersion: () => Promise<string>;
-        getPlatform: () => Promise<string>;
-        openReleases: () => Promise<void>;
-        onStatus: (callback: (status: any) => void) => void | (() => void);
-        offStatus: () => void;
-      };
-      cli?: {
-        getStatus: () => Promise<CliStatus>;
-        install: (method?: CliInstallMethod) => Promise<CliInstallResult>;
-      };
       selectImage?: () => Promise<string[]>;
       saveImage?: (paths: string[]) => Promise<string[]>;
       saveBase64Image?: (base64: string) => Promise<string | null>;
@@ -560,8 +418,6 @@ declare global {
       saveImageBase64?: (fileName: string, base64: string) => Promise<boolean>;
       imageExists?: (fileName: string) => Promise<boolean>;
       clearImages?: () => Promise<boolean>;
-      // WebDAV (bypass CORS via main process)
-      // WebDAV（通过主进程绕过 CORS）
       webdav?: {
         testConnection: (config: {
           url: string;

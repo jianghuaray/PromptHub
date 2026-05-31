@@ -31,9 +31,6 @@ import {
   registerShortcutsIPC,
   toggleWindowForShowApp,
 } from "./shortcuts";
-import { initUpdater, registerUpdaterIPC } from "./updater";
-import { registerS3IPC } from "./s3";
-import { registerWebDAVIPC } from "./webdav";
 import {
   applyE2ESeed,
   configureE2ETestProfile,
@@ -53,7 +50,6 @@ import {
   getDataDir,
   getDatabasePath,
   getImagesDir,
-  getRulesDir,
   getVideosDir,
   getSkillsDir,
   getWorkspaceDir,
@@ -63,7 +59,6 @@ import {
 import { PromptDB } from "./database/prompt";
 import { FolderDB } from "./database/folder";
 import { bootstrapPromptWorkspace, writeRestoreMarker } from "./services/prompt-workspace";
-import { bootstrapRuleWorkspace } from "./services/rules-workspace";
 import { migrateLegacyDataLayout, detectResidualLegacyEntries } from "./services/data-layout-migration";
 import { createUpgradeDataSnapshot, listUpgradeBackups } from "./services/upgrade-backup";
 import { runUpgradeBackupStartupTasks } from "./services/upgrade-backup-startup";
@@ -512,7 +507,6 @@ ipcMain.handle(IPC_CHANNELS.APP_GET_RUNTIME_PATHS, async () => ({
   dataDir: getDataDir(),
   databasePath: getDatabasePath(),
   promptsDir: getPromptsWorkspaceDir(),
-  rulesDir: getRulesDir(),
   skillsDir: getSkillsDir(),
   backupsDir: path.join(app.getPath("userData"), "backups"),
   logsDir: path.join(app.getPath("userData"), "logs"),
@@ -1183,9 +1177,6 @@ ipcMain.handle(
       if (scope.skills) {
         collectDirFiles(getSkillsDir(), "skills/");
       }
-      if (scope.rules) {
-        collectDirFiles(getRulesDir(), "rules/");
-      }
       if (scope.images) {
         collectDirFiles(getImagesDir(), "images/");
       }
@@ -1683,10 +1674,6 @@ app.whenReady().then(async () => {
       return;
     }
 
-    // Register updater IPC as early as possible so renderer calls do not depend on
-    // later startup work (DB bootstrap, workspace sync, window creation) completing.
-    registerUpdaterIPC();
-
     // Register local-image protocol
     // 注册 local-image 协议
     session.defaultSession.protocol.registerFileProtocol(
@@ -1851,19 +1838,6 @@ app.whenReady().then(async () => {
     // （如 Windows 升级后权限问题）阻塞整个启动流程。工作区引导失败不应阻塞应用，
     // 用户仍可通过数据库访问数据，工作区文件可稍后重新同步。
     try {
-      await bootstrapRuleWorkspace();
-    } catch (error) {
-      console.error(
-        "[startup] bootstrapRuleWorkspace failed, continuing without rules workspace bootstrap:",
-        error,
-      );
-      logStartupEvent({
-        event: "startup:bootstrap_rules_workspace_failed",
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    try {
       const bootstrapResult = bootstrapPromptWorkspace(
         new PromptDB(db),
         new FolderDB(db),
@@ -1920,10 +1894,6 @@ app.whenReady().then(async () => {
     // 注册快捷键
     registerShortcuts();
 
-    // Register WebDAV IPC (bypass CORS)
-    // 注册 WebDAV IPC（绕过 CORS）
-    registerWebDAVIPC();
-    registerS3IPC();
     registerE2EIPC();
 
     // Register shortcuts IPC
@@ -1933,12 +1903,6 @@ app.whenReady().then(async () => {
     // Create main window
     // 创建窗口
     await createWindow();
-
-    // Init updater (production only)
-    // 初始化更新器（仅在生产环境）
-    if (!isDev && !isE2E && mainWindow) {
-      initUpdater(mainWindow);
-    }
 
     // macOS: show window when clicking Dock icon
     // macOS: 点击 dock 图标时显示窗口

@@ -239,13 +239,6 @@ export function AppearanceSettings() {
         "My Skills, projects and store workflows",
       ),
     },
-    rules: {
-      label: t("rules.title", "Rules"),
-      description: t(
-        "settings.desktopModuleRulesDesc",
-        "Global and project rule workspaces",
-      ),
-    },
   };
 
   const handleDesktopModuleDragEnd = ({ active, over }: DragEndEvent) => {

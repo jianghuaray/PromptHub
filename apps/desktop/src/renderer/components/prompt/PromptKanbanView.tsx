@@ -6,7 +6,6 @@ import {
   StarIcon,
   CopyIcon,
   EditIcon,
-  PlayIcon,
   MaximizeIcon,
   MinimizeIcon,
   PinIcon,
@@ -29,7 +28,6 @@ interface PromptKanbanViewProps {
   onCopy: (prompt: Prompt) => void;
   onEdit: (prompt: Prompt) => void;
   onDelete: (prompt: Prompt) => void;
-  onAiTest: (prompt: Prompt) => void;
   onVersionHistory: (prompt: Prompt) => void;
   onViewDetail: (prompt: Prompt) => void;
   onContextMenu: (e: React.MouseEvent, prompt: Prompt) => void;
@@ -65,7 +63,6 @@ const KanbanCard = memo(({
   onCollapse,
   onCopy,
   onEdit,
-  onAiTest,
   onToggleFavorite,
   onViewDetail,
   folderName,
@@ -79,7 +76,6 @@ const KanbanCard = memo(({
   onCollapse: () => void;
   onCopy: () => void;
   onEdit: () => void;
-  onAiTest: () => void;
   onToggleFavorite: () => void;
   onViewDetail: () => void;
   folderName: string;
@@ -262,13 +258,6 @@ const KanbanCard = memo(({
           >
             <EditIcon className="w-3.5 h-3.5" />
           </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onAiTest(); }}
-            className="p-1 rounded-md text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            title={t('prompt.aiTest', 'AI 测试')}
-          >
-            <PlayIcon className="w-3.5 h-3.5" />
-          </button>
         </div>
       </div>
     </div>
@@ -283,7 +272,6 @@ export function PromptKanbanView({
   onCopy,
   onEdit,
   onDelete,
-  onAiTest,
   onVersionHistory,
   onViewDetail,
   onContextMenu,
@@ -455,7 +443,6 @@ export function PromptKanbanView({
                         onCollapse={() => handleCollapse(prompt.id)}
                         onCopy={() => onCopy(prompt)}
                         onEdit={() => onEdit(prompt)}
-                        onAiTest={() => onAiTest(prompt)}
                         onToggleFavorite={() => onToggleFavorite(prompt.id)}
                         onViewDetail={() => onViewDetail(prompt)}
                         folderName={prompt.folderId ? (folderNameMap.get(prompt.folderId) || uncategorizedLabel) : uncategorizedLabel}
@@ -478,7 +465,6 @@ export function PromptKanbanView({
         onPin={handlePin}
         onCopy={onCopy}
         onEdit={onEdit}
-        onAiTest={onAiTest}
         onToggleFavorite={onToggleFavorite}
         onViewDetail={onViewDetail}
         onContextMenu={onContextMenu}
@@ -513,7 +499,6 @@ interface UnpinnedKanbanGridProps {
   onPin: (promptId: string) => void;
   onCopy: (prompt: Prompt) => void;
   onEdit: (prompt: Prompt) => void;
-  onAiTest: (prompt: Prompt) => void;
   onToggleFavorite: (promptId: string) => void;
   onViewDetail: (prompt: Prompt) => void;
   onContextMenu: (e: React.MouseEvent, prompt: Prompt) => void;
@@ -538,7 +523,6 @@ function UnpinnedKanbanGrid({
   onPin,
   onCopy,
   onEdit,
-  onAiTest,
   onToggleFavorite,
   onViewDetail,
   onContextMenu,
@@ -634,7 +618,6 @@ function UnpinnedKanbanGrid({
                       onCollapse={() => {}}
                       onCopy={() => onCopy(prompt)}
                       onEdit={() => onEdit(prompt)}
-                      onAiTest={() => onAiTest(prompt)}
                       onToggleFavorite={() => onToggleFavorite(prompt.id)}
                       onViewDetail={() => onViewDetail(prompt)}
                       folderName={

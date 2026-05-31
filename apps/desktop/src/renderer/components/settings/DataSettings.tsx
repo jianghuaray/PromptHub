@@ -78,7 +78,6 @@ type ExportScopeKey =
   | "aiConfig"
   | "settings"
   | "versions"
-  | "rules"
   | "skills";
 export type DataSettingsSubsectionId = DataSettingsSubsection;
 
@@ -212,7 +211,7 @@ export function DataSettings({
   const setDataPath = settings.setDataPath;
   const [currentDataPath, setCurrentDataPath] = useState("");
   const [pendingDataPath, setPendingDataPath] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("");
+  const currentVersion = "";
   const [upgradeBackups, setUpgradeBackups] = useState<UpgradeBackupEntry[]>([]);
   const [loadingUpgradeBackups, setLoadingUpgradeBackups] = useState(false);
   const [upgradeBackupActionId, setUpgradeBackupActionId] = useState<string | null>(null);
@@ -233,7 +232,6 @@ export function DataSettings({
     dataDir: string;
     databasePath: string;
     promptsDir: string;
-    rulesDir: string;
     skillsDir: string;
     backupsDir: string;
     logsDir: string;
@@ -341,7 +339,6 @@ export function DataSettings({
     aiConfig: true,
     settings: true,
     versions: false,
-    rules: true,
     skills: true,
   });
 
@@ -415,11 +412,6 @@ export function DataSettings({
   useEffect(() => {
     window.api?.security?.status().then((status) => {
       setSecurityConfigured(status.configured);
-    });
-    window.electron?.updater?.getVersion?.().then((version) => {
-      if (typeof version === "string") {
-        setCurrentVersion(version);
-      }
     });
   }, []);
 
@@ -863,10 +855,6 @@ export function DataSettings({
     {
       key: "versions",
       label: t("settings.exportVersions", "Version History"),
-    },
-    {
-      key: "rules",
-      label: t("settings.exportRules", "Rules"),
     },
     {
       key: "skills",
@@ -2462,11 +2450,6 @@ export function DataSettings({
                       label: t("settings.applicationLogs", "应用日志"),
                       path: runtimePaths?.logsDir ?? `${normalizedDataPath}/logs`,
                       actionLabel: t("settings.openLogs", "打开日志"),
-                    },
-                    {
-                      label: t("settings.rulesData", "规则文件"),
-                      path: runtimePaths?.rulesDir ?? `${normalizedDataPath}/data/rules`,
-                      actionLabel: t("settings.openFolder"),
                     },
                     {
                       label: t("settings.skillsData", "Skills 目录"),

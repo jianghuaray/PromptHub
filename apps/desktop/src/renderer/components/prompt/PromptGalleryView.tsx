@@ -43,7 +43,6 @@ interface PromptGalleryViewProps {
     onCopy: (prompt: Prompt) => void;
     onEdit: (prompt: Prompt) => void;
     onDelete: (prompt: Prompt) => void;
-    onAiTest: (prompt: Prompt) => void;
     onVersionHistory: (prompt: Prompt) => void;
     onViewDetail: (prompt: Prompt) => void;
 }
@@ -232,7 +231,6 @@ export function PromptGalleryView({
     onCopy,
     onEdit,
     onDelete,
-    onAiTest,
     onVersionHistory,
     onViewDetail,
     onContextMenu,

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef, Children, isValidElement, cloneElement, memo, lazy, Suspense, type CSSProperties } from 'react';
 import type { DragEvent as ReactDragEvent } from 'react';
-import { flushSync } from 'react-dom';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { usePromptStore, ViewMode } from '../../stores/prompt.store';
 import { useFolderStore } from '../../stores/folder.store';
@@ -11,19 +10,15 @@ import {
   PROMPT_LIST_PANE_WIDTH_MAX,
   PROMPT_LIST_PANE_WIDTH_MIN,
 } from '../../stores/ui.store';
-import { resolveScenarioModel } from '../../services/ai-defaults';
 import { PromptListHeader } from '../prompt/PromptListHeader';
-import type { OutputFormatConfig, VariableInputImageAttachment } from '../prompt/VariableInputModal';
 
 // Lazy load SkillManager for better initial load performance
 // 懒加载 SkillManager 以提升初始加载性能
 const SkillManager = lazy(() => import('../skill/SkillManager').then(m => ({ default: m.SkillManager })));
-const RulesManager = lazy(() => import('../rules/RulesManager').then(m => ({ default: m.RulesManager })));
 const EditPromptModal = lazy(() => import('../prompt/EditPromptModal').then(m => ({ default: m.EditPromptModal })));
 const PromptTableView = lazy(() => import('../prompt/PromptTableView').then(m => ({ default: m.PromptTableView })));
 const PromptGalleryView = lazy(() => import('../prompt/PromptGalleryView').then(m => ({ default: m.PromptGalleryView })));
 const PromptKanbanView = lazy(() => import('../prompt/PromptKanbanView').then(m => ({ default: m.PromptKanbanView })));
-const AiTestModal = lazy(() => import('../prompt/AiTestModal').then(m => ({ default: m.AiTestModal })));
 const PromptDetailModal = lazy(() => import('../prompt/PromptDetailModal').then(m => ({ default: m.PromptDetailModal })));
 const VariableInputModal = lazy(() => import('../prompt/VariableInputModal').then(m => ({ default: m.VariableInputModal })));
 const VersionHistoryModal = lazy(() => import('../prompt/VersionHistoryModal').then(m => ({ default: m.VersionHistoryModal })));
@@ -32,17 +27,15 @@ const loadingFallback = (
     <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
   </div>
 );
-import { StarIcon, CopyIcon, HistoryIcon, HashIcon, FolderIcon, SparklesIcon, EditIcon, TrashIcon, CheckIcon, PlayIcon, LoaderIcon, XIcon, GitCompareIcon, ClockIcon, GlobeIcon, PinIcon, MessageSquareTextIcon, ImageIcon, DownloadIcon, SaveIcon, ZoomInIcon, Share2Icon, PaperclipIcon } from 'lucide-react';
+import { StarIcon, CopyIcon, HistoryIcon, HashIcon, FolderIcon, SparklesIcon, EditIcon, TrashIcon, CheckIcon, LoaderIcon, XIcon, ClockIcon, GlobeIcon, PinIcon, MessageSquareTextIcon, ImageIcon, SaveIcon, Share2Icon } from 'lucide-react';
 import { ContextMenu, ContextMenuItem } from '../ui/ContextMenu';
 import { ImagePreviewModal } from '../ui/ImagePreviewModal';
 import { LocalImage } from '../ui/LocalImage';
 import { Input } from '../ui/Input';
 import { handleMarkdownListKeyDown } from '../ui/Textarea';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
-import { CollapsibleThinking } from '../ui/CollapsibleThinking';
 import { ColumnResizer } from '../ui/ColumnResizer';
 import { useToast } from '../ui/Toast';
-import { chatCompletion, generateImage, buildMessagesFromPrompt, multiModelCompare, AITestResult, StreamCallbacks } from '../../services/ai';
 import { useTranslation } from 'react-i18next';
 import type { Prompt, PromptVersion, UpdatePromptDTO } from '@prompthub/shared/types';
 import ReactMarkdown from 'react-markdown';
@@ -63,15 +56,6 @@ import { getFlattenedTree } from './tree/utilities';
 import { renderFolderIcon } from './folderIconHelper';
 
 const PROMPT_CARD_ESTIMATED_HEIGHT = 76;
-const MAX_AI_TEST_IMAGES = 8;
-const MAX_AI_TEST_IMAGE_BYTES = 10 * 1024 * 1024;
-const SUPPORTED_AI_TEST_IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/jpg',
-  'image/webp',
-  'image/gif',
-]);
 
 function escapeRegExp(str: string) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -333,12 +317,6 @@ function getDetailInlineUserPromptField(
 }
 
 export function MainContent() {
-  const appModule = useUIStore((state) => state.appModule);
-
-  if (appModule === 'rules') {
-    return <Suspense fallback={loadingFallback}><RulesManager /></Suspense>;
-  }
-
   return <PromptSkillMainContent />;
 }
 
@@ -374,10 +352,7 @@ function PromptSkillMainContent() {
   const [copied, setCopied] = useState(false);
   const [shared, setShared] = useState(false);
 
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [isVariableModalOpen, setIsVariableModalOpen] = useState(false);
-  const [isAiTestVariableModalOpen, setIsAiTestVariableModalOpen] = useState(false);
-  const [isCompareVariableModalOpen, setIsCompareVariableModalOpen] = useState(false);
   // 用于列表/画廊视图复制时的变量弹窗
   const [isCopyVariableModalOpen, setIsCopyVariableModalOpen] = useState(false);
   const [copyPrompt, setCopyPrompt] = useState<Prompt | null>(null);
@@ -394,43 +369,6 @@ function PromptSkillMainContent() {
   const tagFilterMode = useSettingsStore((state) => state.tagFilterMode);
   const uiViewMode = useUIStore((state) => state.viewMode);
   const { showToast } = useToast();
-  const compareBuffersRef = useRef<Record<string, { response: string; thinkingContent: string }>>({});
-  const compareFlushRafRef = useRef<number | null>(null);
-
-  const flushCompareBuffers = useCallback(() => {
-    setCompareResults((prev) => {
-      if (!prev) return prev;
-      return prev.map((result) => {
-        const buffered = result.id ? compareBuffersRef.current[result.id] : undefined;
-        if (!buffered) {
-          return result;
-        }
-        return {
-          ...result,
-          response: buffered.response,
-          thinkingContent: buffered.thinkingContent,
-        };
-      });
-    });
-  }, []);
-
-  const scheduleCompareFlush = useCallback(() => {
-    if (compareFlushRafRef.current !== null) return;
-    compareFlushRafRef.current = requestAnimationFrame(() => {
-      compareFlushRafRef.current = null;
-      flushSync(() => {
-        flushCompareBuffers();
-      });
-    });
-  }, [flushCompareBuffers]);
-
-  const resetCompareBuffers = useCallback(() => {
-    if (compareFlushRafRef.current !== null) {
-      cancelAnimationFrame(compareFlushRafRef.current);
-      compareFlushRafRef.current = null;
-    }
-    compareBuffersRef.current = {};
-  }, []);
 
   const handleSelectPrompt = useCallback((prompt: Prompt, e: React.MouseEvent) => {
     // Check if we are in multi-select mode (Ctrl/Cmd/Shift)
@@ -473,182 +411,13 @@ function PromptSkillMainContent() {
   const highlightTerms = useMemo(() => getHighlightTerms(searchQuery), [searchQuery]);
   const selectedPromptIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  // Store test states/results by prompt ID (persisted in component state)
-  // 按 prompt ID 保存测试状态和结果（持久化）
-  const [promptTestStates, setPromptTestStates] = useState<Record<string, {
-    isTestingAI: boolean;
-    isComparingModels: boolean;
-    aiResponse: string | null;
-    aiThinking: string | null;
-    isAiResponseImage?: boolean;
-    compareResults: AITestResult[] | null;
-    compareError: string | null;
-  }>>({});
-
-  // Get current prompt test state and results
-  // 获取当前 prompt 的测试状态和结果
-  const currentState = selectedId ? promptTestStates[selectedId] : null;
-  const isTestingAI = currentState?.isTestingAI || false;
-  const isComparingModels = currentState?.isComparingModels || false;
-  const compareResults = currentState?.compareResults || null;
-  const compareError = currentState?.compareError || null;
-
-  // Separate streaming state for real-time display (bypasses complex state updates)
-  // 独立的流式状态，用于实时显示（绕过复杂的状态更新）
-  const [streamingContent, setStreamingContent] = useState<string>('');
-  const [streamingThinking, setStreamingThinking] = useState<string>('');
-  const [isStreaming, setIsStreaming] = useState(false);
-
-  // Use streaming content when actively streaming, otherwise use stored state
-  // 流式传输时使用流式内容，否则使用存储的状态
-  const aiResponse = isStreaming ? streamingContent : (currentState?.aiResponse || null);
-  const aiThinking = isStreaming ? streamingThinking : (currentState?.aiThinking || null);
-  const isAiResponseImage = currentState?.isAiResponseImage || false;
-
-  // Update current prompt test state
-  // 更新当前 prompt 的测试状态
-  const updatePromptState = (promptId: string, updates: Partial<typeof currentState>) => {
-    setPromptTestStates(prev => ({
-      ...prev,
-      [promptId]: {
-        isTestingAI: prev[promptId]?.isTestingAI || false,
-        isComparingModels: prev[promptId]?.isComparingModels || false,
-        aiResponse: prev[promptId]?.aiResponse || null,
-        aiThinking: prev[promptId]?.aiThinking || null,
-        isAiResponseImage: prev[promptId]?.isAiResponseImage || false,
-        compareResults: prev[promptId]?.compareResults || null,
-        compareError: prev[promptId]?.compareError || null,
-        ...updates
-      }
-    }));
-  };
-
-  const setIsTestingAI = (testing: boolean) => {
-    if (selectedId) updatePromptState(selectedId, { isTestingAI: testing });
-  };
-
-  const setIsComparingModels = (comparing: boolean) => {
-    if (selectedId) updatePromptState(selectedId, { isComparingModels: comparing });
-  };
-
-  const setAiResponse = (response: string | null | ((prev: string | null) => string | null)) => {
-    if (selectedId) {
-      if (typeof response === 'function') {
-        const currentValue = promptTestStates[selectedId]?.aiResponse || null;
-        updatePromptState(selectedId, { aiResponse: response(currentValue) });
-      } else {
-        updatePromptState(selectedId, { aiResponse: response });
-      }
-    }
-  };
-
-  const setAiThinking = (thinking: string | null | ((prev: string | null) => string | null)) => {
-    if (selectedId) {
-      if (typeof thinking === 'function') {
-        const currentValue = promptTestStates[selectedId]?.aiThinking || null;
-        updatePromptState(selectedId, { aiThinking: thinking(currentValue) });
-      } else {
-        updatePromptState(selectedId, { aiThinking: thinking });
-      }
-    }
-  };
-
-  const setIsAiResponseImage = (isImage: boolean) => {
-    if (selectedId) {
-      updatePromptState(selectedId, { isAiResponseImage: isImage });
-    }
-  };
-
-  const setCompareResults = (results: AITestResult[] | null | ((prev: AITestResult[] | null) => AITestResult[] | null)) => {
-    if (selectedId) {
-      if (typeof results === 'function') {
-        const currentValue = promptTestStates[selectedId]?.compareResults || null;
-        updatePromptState(selectedId, { compareResults: results(currentValue) });
-      } else {
-        updatePromptState(selectedId, { compareResults: results });
-      }
-    }
-  };
-
-  const setCompareError = (error: string | null) => {
-    if (selectedId) updatePromptState(selectedId, { compareError: error });
-  };
-
   // Reset selected prompt when switching folders (privacy)
   // 切换 Folder 时重置选中的 Prompt (隐私保护)
   useEffect(() => {
     selectPrompt(null);
   }, [selectedFolderId, selectPrompt]);
 
-  // Reset selected models when switching prompts
-  // 切换 Prompt 时重置选中的模型
-  useEffect(() => {
-    setSelectedModelIds((prev) => (prev.length === 0 ? prev : []));
-  }, [selectedId]);
-
-  // AI configuration
-  // AI 配置
-  const aiProvider = useSettingsStore((state) => state.aiProvider);
-  const aiApiProtocol = useSettingsStore((state) => state.aiApiProtocol);
-  const aiApiKey = useSettingsStore((state) => state.aiApiKey);
-  const aiApiUrl = useSettingsStore((state) => state.aiApiUrl);
-  const aiModel = useSettingsStore((state) => state.aiModel);
-  const aiModels = useSettingsStore((state) => state.aiModels);
-  const scenarioModelDefaults = useSettingsStore((state) => state.scenarioModelDefaults);
   const showCopyNotification = useSettingsStore((state) => state.showCopyNotification);
-
-  const defaultChatModel = useMemo(() => {
-    return resolveScenarioModel(aiModels, scenarioModelDefaults, 'promptTest', 'chat');
-  }, [aiModels, scenarioModelDefaults]);
-
-  const defaultImageModel = useMemo(() => {
-    return resolveScenarioModel(aiModels, scenarioModelDefaults, 'imageTest', 'image');
-  }, [aiModels, scenarioModelDefaults]);
-
-  const compareModels = useMemo(() => {
-    const isImagePrompt = prompts.find((p) => p.id === selectedId)?.promptType === 'image';
-    if (isImagePrompt) {
-      return [];
-    }
-    return aiModels.filter((model) => (model.type ?? 'chat') === 'chat');
-  }, [aiModels, prompts, selectedId]);
-
-  useEffect(() => {
-    setSelectedModelIds((prev) => {
-      const next = prev.filter((id) => compareModels.some((model) => model.id === id));
-      return next.length === prev.length ? prev : next;
-    });
-  }, [compareModels]);
-
-  useEffect(() => {
-    return () => {
-      resetCompareBuffers();
-    };
-  }, [resetCompareBuffers]);
-
-  const singleChatConfig = useMemo(() => {
-    if (defaultChatModel) {
-      return {
-        id: defaultChatModel.id,
-        provider: defaultChatModel.provider,
-        apiProtocol: defaultChatModel.apiProtocol,
-        apiKey: defaultChatModel.apiKey,
-        apiUrl: defaultChatModel.apiUrl,
-        model: defaultChatModel.model,
-        chatParams: defaultChatModel.chatParams,
-      };
-    }
-    return {
-      provider: aiProvider,
-      apiProtocol: aiApiProtocol,
-      apiKey: aiApiKey,
-      apiUrl: aiApiUrl,
-      model: aiModel,
-    };
-  }, [defaultChatModel, aiProvider, aiApiProtocol, aiApiKey, aiApiUrl, aiModel]);
-
-  const canRunSingleAiTest = !!((singleChatConfig.apiKey && singleChatConfig.apiUrl && singleChatConfig.model) || 
-    (defaultImageModel && defaultImageModel.apiKey && defaultImageModel.apiUrl && defaultImageModel.model));
 
   useEffect(() => {
     setRenderMarkdownEnabled((prev) =>
@@ -743,32 +512,6 @@ function PromptSkillMainContent() {
     );
   };
 
-  const renderAiResponseContent = (content?: string) => {
-    if (!content) {
-      return null;
-    }
-
-    if (!renderMarkdownEnabled) {
-      return (
-        <div className="text-sm leading-relaxed whitespace-pre-wrap break-words">
-          {content}
-        </div>
-      );
-    }
-
-    return (
-      <div className="text-[15px] leading-relaxed markdown-content space-y-3 break-words">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          rehypePlugins={rehypePlugins}
-          components={markdownComponents}
-        >
-          {content}
-        </ReactMarkdown>
-      </div>
-    );
-  };
-
   const toggleRenderMarkdown = () => {
     const next = !renderMarkdownEnabled;
     setRenderMarkdownEnabled(next);
@@ -782,373 +525,6 @@ function PromptSkillMainContent() {
         userPrompt: version.userPrompt,
       });
       showToast(t('toast.restored'), 'success');
-    }
-  };
-
-  const formatAiTestImageSize = (bytes: number): string => {
-    if (bytes >= 1024 * 1024) {
-      return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-    }
-    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  };
-
-  const readInlineAiTestImage = (file: File): Promise<VariableInputImageAttachment> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (typeof reader.result !== 'string') {
-          reject(new Error(t('prompt.aiTestImageReadFailed')));
-          return;
-        }
-
-        const commaIndex = reader.result.indexOf(',');
-        if (commaIndex === -1) {
-          reject(new Error(t('prompt.aiTestImageReadFailed')));
-          return;
-        }
-
-        resolve({
-          id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
-          name: file.name,
-          mimeType: file.type,
-          size: file.size,
-          dataUrl: reader.result,
-          base64: reader.result.slice(commaIndex + 1),
-        });
-      };
-      reader.onerror = () => reject(new Error(t('prompt.aiTestImageReadFailed')));
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleInlineAiTestImageSelection = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-
-    const remainingSlots = MAX_AI_TEST_IMAGES - inlineAiTestImages.length;
-    if (remainingSlots <= 0) {
-      showToast(t('prompt.aiTestImageLimit', { count: MAX_AI_TEST_IMAGES }), 'error');
-      return;
-    }
-
-    const acceptedFiles: File[] = [];
-    for (const file of Array.from(files).slice(0, remainingSlots)) {
-      if (!SUPPORTED_AI_TEST_IMAGE_MIME_TYPES.has(file.type)) {
-        showToast(t('prompt.aiTestImageUnsupported', { name: file.name }), 'error');
-        continue;
-      }
-      if (file.size > MAX_AI_TEST_IMAGE_BYTES) {
-        showToast(t('prompt.aiTestImageTooLarge', { name: file.name, size: formatAiTestImageSize(MAX_AI_TEST_IMAGE_BYTES) }), 'error');
-        continue;
-      }
-      acceptedFiles.push(file);
-    }
-
-    if (acceptedFiles.length === 0) return;
-
-    try {
-      const attachments = await Promise.all(acceptedFiles.map(readInlineAiTestImage));
-      setInlineAiTestImages((prev) => [...prev, ...attachments].slice(0, MAX_AI_TEST_IMAGES));
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : t('prompt.aiTestImageReadFailed'), 'error');
-    }
-  };
-
-  const runAiTest = async (
-    systemPrompt: string | undefined,
-    userPrompt: string,
-    promptId?: string,
-    outputFormat?: OutputFormatConfig,
-    imageAttachments: VariableInputImageAttachment[] = inlineAiTestImages,
-  ) => {
-    // Do not use modal in card view; render results inline
-    // 卡片视图不使用弹窗，直接在页面内显示结果
-    setIsTestingAI(true);
-    setAiResponse(null);
-    setAiThinking(null);
-    setIsAiResponseImage(false);
-    setIsAiTestVariableModalOpen(false);
-
-    // Increment usage count
-    // 增加使用次数
-    const targetId = promptId || selectedId;
-    if (targetId) {
-      await incrementUsageCount(targetId);
-    }
-
-    // Get the current prompt to check its type
-    // 获取当前 prompt 以检查其类型
-    const currentPrompt = prompts.find(p => p.id === targetId);
-    const currentPromptType = currentPrompt?.promptType || 'text';
-
-    try {
-      if (!canRunSingleAiTest) {
-        throw new Error(t('toast.configAI') || '请先配置 AI');
-      }
-
-      // Use promptType to decide which API to call
-      // 根据 promptType 决定调用哪个 API
-      if (currentPromptType === 'image') {
-         if (!defaultImageModel) {
-             throw new Error(t('prompt.mismatchImage') || 'Prompt type is Image but no Image Model configured');
-         }
-
-         console.log('[MainContent] Image Prompt. Using model:', defaultImageModel.name || defaultImageModel.model);
-         try {
-             const result = await generateImage({
-                 provider: defaultImageModel.provider,
-                 apiProtocol: defaultImageModel.apiProtocol,
-                 apiKey: defaultImageModel.apiKey,
-                 apiUrl: defaultImageModel.apiUrl,
-                 model: defaultImageModel.model,
-                 imageParams: defaultImageModel.imageParams
-             } as any, userPrompt);
-             
-             const imageUrl = result.data?.[0]?.url;
-             const imageBase64 = result.data?.[0]?.b64_json;
-             
-             if (imageUrl || imageBase64) {
-                 const displayUrl = imageUrl || `data:image/png;base64,${imageBase64}`;
-                 setIsAiResponseImage(true);
-                 setAiResponse(displayUrl);
-                 
-                 // Save generated image to prompt's images array
-                 // 将生成的图片保存到 prompt 的预览图中
-                 if (targetId) {
-                     try {
-                         let savedFileName: string | null = null;
-                         
-                         if (imageUrl) {
-                             // Download from URL
-                             savedFileName = await (window.electron as any).downloadImage(imageUrl);
-                         } else if (imageBase64) {
-                             // Save base64 directly
-                             const fileName = `ai-generated-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.png`;
-                             const success = await (window.electron as any).saveImageBase64(fileName, imageBase64);
-                             if (success) savedFileName = fileName;
-                         }
-                         
-                         if (savedFileName && currentPrompt) {
-                             const updatedImages = [...(currentPrompt.images || []), savedFileName];
-                             await updatePrompt(targetId, { images: updatedImages });
-                             showToast(t('toast.imageSaved'), 'success');
-                         }
-                     } catch (saveErr) {
-                         console.warn('[MainContent] Failed to save generated image:', saveErr);
-                         // Still show the image even if saving failed
-                     }
-                 }
-                 return; 
-             }
-         } catch (e) {
-             console.error("[MainContent] Image generation failed:", e);
-             setAiResponse(`${t('common.error')}: ${e instanceof Error ? e.message : 'Image generation failed'}`);
-             showToast(t('toast.aiFailed'), 'error');
-             return;
-         }
-      }
-
-      if (currentPromptType === 'video') {
-         // Video generation not yet implemented
-         // 视频生成尚未实现
-         setAiResponse(t('prompt.videoNotSupported'));
-         showToast(t('prompt.videoNotSupported'), 'info');
-         return;
-      }
-
-      // Default: Text/Chat mode
-      // 默认：文本对话模式
-
-      if (!(singleChatConfig.apiKey && singleChatConfig.apiUrl && singleChatConfig.model)) {
-        if (defaultImageModel) {
-             throw new Error(t('prompt.mismatchText'));
-        }
-        throw new Error(t('toast.configAI'));
-      }
-
-      const messages = buildMessagesFromPrompt(systemPrompt, userPrompt, undefined, imageAttachments);
-      const useStream = !!singleChatConfig.chatParams?.stream;
-      const useThinking = !!singleChatConfig.chatParams?.enableThinking;
-
-      // Debug: Log stream configuration / 调试：记录流式配置
-      console.log('[MainContent] AI Test - Stream:', useStream, 'Thinking:', useThinking);
-      console.log('[MainContent] chatParams:', singleChatConfig.chatParams);
-
-      if (useStream) {
-        // Start streaming mode - use independent state for real-time updates
-        // 开始流式模式 - 使用独立状态进行实时更新
-        setIsStreaming(true);
-        setStreamingContent('');
-        setStreamingThinking('');
-      }
-
-      // Use refs for buffering raw data / 使用 ref 缓冲原始数据
-      const fullContentRef = { current: '' };
-      const fullThinkingRef = { current: '' };
-
-      let contentRafId: number | null = null;
-      let thinkingRafId: number | null = null;
-
-      const scheduleContentFlush = () => {
-        if (contentRafId !== null) return;
-        contentRafId = requestAnimationFrame(() => {
-          contentRafId = null;
-          flushSync(() => {
-            setStreamingContent(fullContentRef.current);
-          });
-        });
-      };
-
-      const scheduleThinkingFlush = () => {
-        if (thinkingRafId !== null) return;
-        thinkingRafId = requestAnimationFrame(() => {
-          thinkingRafId = null;
-          flushSync(() => {
-            setStreamingThinking(fullThinkingRef.current);
-          });
-        });
-      };
-
-      const result = await chatCompletion(singleChatConfig as any, messages, {
-        stream: useStream,
-        enableThinking: useThinking,
-        // Pass output format if specified (Issue #38)
-        // 传递输出格式（如果指定）
-        responseFormat: outputFormat,
-        streamCallbacks: useStream ? {
-          onContent: (chunk) => {
-            fullContentRef.current += chunk;
-            scheduleContentFlush();
-          },
-          onThinking: (chunk) => {
-            fullThinkingRef.current += chunk;
-            scheduleThinkingFlush();
-          },
-          onComplete: (fullContent, thinkingContent) => {
-            console.log(`[Stream UI] Complete!`);
-            if (contentRafId !== null) {
-              cancelAnimationFrame(contentRafId);
-              contentRafId = null;
-            }
-            if (thinkingRafId !== null) {
-              cancelAnimationFrame(thinkingRafId);
-              thinkingRafId = null;
-            }
-            // End streaming mode and save to persistent state
-            // 结束流式模式并保存到持久状态
-            setIsStreaming(false);
-            setAiResponse(fullContent);
-            if (thinkingContent) {
-              setAiThinking(thinkingContent);
-            }
-          }
-        } : undefined,
-      });
-
-      // Final consistency guarantee
-      // 最终一致性保证
-      if (!useStream) {
-        setAiResponse(result.content);
-        setAiThinking(result.thinkingContent || null);
-      } else {
-        // Ensure streaming state is off and content is saved
-        setIsStreaming(false);
-        setAiResponse(fullContentRef.current || result.content);
-        if (fullThinkingRef.current) {
-          setAiThinking(fullThinkingRef.current);
-        }
-      }
-    } catch (error) {
-      setIsStreaming(false);
-      setAiResponse(`${t('common.error')}: ${error instanceof Error ? error.message : t('common.error')}`);
-      showToast(t('toast.aiFailed'), 'error');
-    } finally {
-      setIsTestingAI(false);
-    }
-  };
-
-  // Multi-model comparison (supports variable substitution)
-  // 多模型对比函数（支持变量替换后的 prompt）
-  const runModelCompare = async (
-    systemPrompt: string | undefined,
-    userPrompt: string,
-    imageAttachments: VariableInputImageAttachment[] = inlineAiTestImages,
-  ) => {
-    setIsCompareVariableModalOpen(false);
-    const selectedConfigs = compareModels
-      .filter((m) => selectedModelIds.includes(m.id))
-      .map((m) => ({
-        id: m.id,
-        provider: m.provider,
-        apiProtocol: m.apiProtocol,
-        apiKey: m.apiKey,
-        apiUrl: m.apiUrl,
-        model: m.model,
-        chatParams: m.chatParams,
-        imageParams: m.imageParams,
-      }));
-
-    const messages = buildMessagesFromPrompt(systemPrompt, userPrompt, undefined, imageAttachments);
-
-    setIsComparingModels(true);
-    setCompareError(null);
-
-    try {
-      resetCompareBuffers();
-      compareBuffersRef.current = Object.fromEntries(
-        selectedConfigs.map((config) => [
-          config.id,
-          { response: '', thinkingContent: '' },
-        ])
-      );
-
-      // Streaming support: render placeholder results early so users can see streaming progress
-      // 支持流式：提前渲染占位结果，让用户能看到"正在流式输出"的差异
-      setCompareResults(
-        selectedConfigs.map((c) => ({
-          id: c.id,
-          success: true,
-          response: '',
-          thinkingContent: '',
-          latency: 0,
-          model: c.model,
-          provider: c.provider,
-        }))
-      );
-
-      // Create stream callbacks map for streaming-enabled models
-      // 为启用流式的模型创建流式回调 Map
-      const streamCallbacksMap = new Map<string, StreamCallbacks>();
-      for (const cfg of selectedConfigs) {
-        if (cfg.chatParams?.stream) {
-          streamCallbacksMap.set(cfg.id, {
-            onContent: (chunk: string) => {
-              const buffer = compareBuffersRef.current[cfg.id];
-              if (!buffer) return;
-              buffer.response += chunk;
-              scheduleCompareFlush();
-            },
-            onThinking: (chunk: string) => {
-              const buffer = compareBuffersRef.current[cfg.id];
-              if (!buffer) return;
-              buffer.thinkingContent += chunk;
-              scheduleCompareFlush();
-            },
-          });
-        }
-      }
-
-      const result = await multiModelCompare(selectedConfigs as any, messages, {
-        streamCallbacksMap,
-      });
-      flushCompareBuffers();
-      // In streaming mode, results are updated via callbacks; sync once more for non-streaming models
-      // 流式模式下，结果已经在回调中更新，这里只做最终同步（确保非流式模型的结果也正确显示）
-      setCompareResults(result.results);
-    } catch (error) {
-      setCompareError(error instanceof Error ? error.message : t('common.error'));
-    } finally {
-      resetCompareBuffers();
-      setIsComparingModels(false);
     }
   };
 
@@ -1224,18 +600,6 @@ function PromptSkillMainContent() {
   const detailTitleInputRef = useRef<HTMLInputElement>(null);
   const detailSystemPromptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const detailUserPromptTextareaRef = useRef<HTMLTextAreaElement>(null);
-  // AI test modal state
-  // AI 测试弹窗状态
-  const [isAiTestModalOpen, setIsAiTestModalOpen] = useState(false);
-  const [aiTestPrompt, setAiTestPrompt] = useState<Prompt | null>(null);
-  const [aiTestInitialMode, setAiTestInitialMode] = useState<'single' | 'compare' | 'image'>('single');
-  const [inlineAiTestImages, setInlineAiTestImages] = useState<VariableInputImageAttachment[]>([]);
-  const inlineAiTestImageInputRef = useRef<HTMLInputElement | null>(null);
-  // AI response cache (for list view preview)
-  // AI 响应缓存（用于列表视图预览）
-  const [aiResponseCache, setAiResponseCache] = useState<Record<string, string>>({});
-  const setViewMode = usePromptStore((state) => state.setViewMode);
-
   const detailInlineCurrentValues = useMemo(() => {
     if (!selectedPrompt) {
       return null;
@@ -1261,7 +625,6 @@ function PromptSkillMainContent() {
     setIsDetailInlineEditing(false);
     setIsDetailInlineSaving(false);
     setDetailInlineActiveField('title');
-    setInlineAiTestImages([]);
   }, [selectedPrompt?.id]);
 
   useEffect(() => {
@@ -1461,18 +824,6 @@ function PromptSkillMainContent() {
     }
     setDeleteConfirm({ isOpen: false, prompt: null });
   }, [deleteConfirm.prompt, deletePrompt, showToast, t]);
-
-  // Handle AI test through the unified workbench drawer
-  // 通过统一测试抽屉处理 AI 测试
-  const handleAiTestFromTable = (prompt: Prompt, initialMode: 'single' | 'compare' | 'image' = 'single') => {
-    if (!canRunSingleAiTest) {
-      showToast(t('toast.configAI'), 'error');
-      return;
-    }
-    setAiTestPrompt(prompt);
-    setAiTestInitialMode(initialMode);
-    setIsAiTestModalOpen(true);
-  };
 
   // Detail modal state
   // 查看详情弹窗状态
@@ -1743,11 +1094,6 @@ function PromptSkillMainContent() {
         onClick: () => togglePinned(contextMenu.prompt.id),
       },
       {
-        label: t('prompt.aiTest'),
-        icon: <PlayIcon className="w-4 h-4" />,
-        onClick: () => handleAiTestFromTable(contextMenu.prompt),
-      },
-      {
         label: t('prompt.history'),
         icon: <HistoryIcon className="w-4 h-4" />,
         onClick: () => handleVersionHistory(contextMenu.prompt),
@@ -1765,20 +1111,7 @@ function PromptSkillMainContent() {
         onClick: () => handleDeletePrompt(contextMenu.prompt),
       },
     ];
-  }, [contextMenu, flattenedFolders, folderPathById, t, toggleFavorite, togglePinned, handleViewDetail, handleCopyPrompt, handleDuplicatePrompt, handleSharePrompt, handleAiTestFromTable, handleVersionHistory, handleDeletePrompt, handleMovePrompt]);
-
-  const handleAiUsageIncrement = async (id: string, model?: string) => {
-    await incrementUsageCount(id);
-  };
-
-  // Save AI response into prompt
-  // 保存 AI 响应到 Prompt
-  const handleSaveAiResponse = async (promptId: string, response: string) => {
-    await updatePrompt(promptId, { lastAiResponse: response });
-    // Update cache as well for immediate UI refresh
-    // 同时更新缓存以便立即显示
-    setAiResponseCache((prev) => ({ ...prev, [promptId]: response }));
-  };
+  }, [contextMenu, flattenedFolders, folderPathById, t, toggleFavorite, togglePinned, handleViewDetail, handleCopyPrompt, handleDuplicatePrompt, handleSharePrompt, handleVersionHistory, handleDeletePrompt, handleMovePrompt]);
 
   useEffect(() => {
     setIsTagDropActive(false);
@@ -1859,10 +1192,8 @@ function PromptSkillMainContent() {
               onCopy={handleCopyPrompt}
               onEdit={(prompt) => setEditingPrompt(prompt)}
               onDelete={handleDeletePrompt}
-              onAiTest={handleAiTestFromTable}
               onVersionHistory={handleVersionHistory}
               onViewDetail={handleViewDetail}
-              aiResults={aiResponseCache}
               onBatchFavorite={handleBatchFavorite}
               onBatchMove={handleBatchMove}
               onBatchDelete={handleBatchDelete}
@@ -1888,7 +1219,6 @@ function PromptSkillMainContent() {
               onCopy={handleCopyPrompt}
               onEdit={(prompt) => setEditingPrompt(prompt)}
               onDelete={handleDeletePrompt}
-              onAiTest={handleAiTestFromTable}
               onVersionHistory={handleVersionHistory}
               onViewDetail={handleViewDetail}
               onContextMenu={handleContextMenu}
@@ -1913,7 +1243,6 @@ function PromptSkillMainContent() {
               onCopy={handleCopyPrompt}
               onEdit={(prompt) => setEditingPrompt(prompt)}
               onDelete={handleDeletePrompt}
-              onAiTest={handleAiTestFromTable}
               onVersionHistory={handleVersionHistory}
               onViewDetail={handleViewDetail}
               onContextMenu={handleContextMenu}
@@ -2370,135 +1699,6 @@ function PromptSkillMainContent() {
                     )}
                   </div>
 
-                  {/* Multi-model comparison */}
-                  {/* 多模型对比区域 */}
-                  {selectedPrompt.promptType !== 'image' && compareModels.length > 0 && (
-                    <div className="mb-4 p-4 rounded-xl app-wallpaper-panel border border-border">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <GitCompareIcon className="w-4 h-4 text-primary" />
-                          <span className="text-sm font-medium">{t('settings.multiModelCompare')}</span>
-                          <span className="text-xs text-muted-foreground">{t('prompt.selectModelsHint')}</span>
-                        </div>
-                        <button
-                          onClick={() => handleAiTestFromTable(selectedPrompt, 'compare')}
-                          disabled={isDetailInlineEditing}
-                          className="flex items-center gap-2 h-9 px-4 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                        >
-                          <GitCompareIcon className="w-3 h-3" />
-                          <span>{t('settings.runCompare')}</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* AI response panel */}
-                  {/* AI 测试响应区域 */}
-                  {(isTestingAI || aiResponse) && (
-                    <div className="mb-4 p-4 rounded-xl app-wallpaper-panel border border-border">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <SparklesIcon className="w-4 h-4 text-primary" />
-                          <span className="text-sm font-medium">{t('prompt.aiResponse', 'AI 响应')}</span>
-                          <span className="text-xs text-muted-foreground">({(selectedPrompt?.promptType === 'image' || isAiResponseImage) ? (defaultImageModel?.model || aiModel) : aiModel})</span>
-                        </div>
-                        {aiResponse && (
-                          <button
-                            onClick={async () => {
-                              await navigator.clipboard.writeText(aiResponse);
-                              showToast(t('toast.copied'), 'success');
-                            }}
-                            className="p-1.5 rounded hover:bg-muted transition-colors"
-                            title={t('prompt.copy')}
-                          >
-                            <CopyIcon className="w-4 h-4 text-muted-foreground" />
-                          </button>
-                        )}
-                      </div>
-                      {isTestingAI && !aiResponse ? (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <LoaderIcon className="w-4 h-4 animate-spin" />
-                          <span className="text-sm">{t('prompt.testing', '测试中...')}</span>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {isTestingAI ? (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <LoaderIcon className="w-3 h-3 animate-spin" />
-                              <span>{t('prompt.testing', '测试中...')}</span>
-                            </div>
-                          ) : null}
-                          {/* Collapsible thinking process / 可折叠的思考过程 */}
-                          <CollapsibleThinking
-                            content={aiThinking}
-                            isLoading={isTestingAI}
-                          />
-                          <div className="text-sm leading-relaxed max-h-80 overflow-y-auto">
-                            {isAiResponseImage && aiResponse ? (
-                              <div className="relative group">
-                                <img 
-                                  src={aiResponse} 
-                                  className="max-w-full rounded-lg shadow-sm bg-black/5 cursor-pointer hover:opacity-90 transition-opacity" 
-                                  alt="Generated AI"
-                                  onClick={() => setPreviewImage(aiResponse)}
-                                />
-                                {/* Image action buttons */}
-                                <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => setPreviewImage(aiResponse)}
-                                    className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors"
-                                    title={t('common.preview', '放大预览')}
-                                  >
-                                    <ZoomInIcon className="w-4 h-4" />
-                                  </button>
-                                    <button
-                                      onClick={async () => {
-                                        try {
-                                          const link = document.createElement('a');
-                                          let href = aiResponse;
-                                          
-                                          // For remote URLs, fetch as blob to force download
-                                          if (!aiResponse.startsWith('data:')) {
-                                              try {
-                                                  const resp = await fetch(aiResponse);
-                                                  const blob = await resp.blob();
-                                                  href = URL.createObjectURL(blob);
-                                              } catch (e) {
-                                                  console.warn('Failed to fetch image blob, falling back to direct link', e);
-                                              }
-                                          }
-                                          
-                                          link.href = href;
-                                          link.download = `ai-generated-${Date.now()}.png`;
-                                          document.body.appendChild(link);
-                                          link.click();
-                                          document.body.removeChild(link);
-                                          
-                                          if (href !== aiResponse) {
-                                              setTimeout(() => URL.revokeObjectURL(href), 100);
-                                          }
-                                          
-                                          showToast(t('common.downloadSuccess'), 'success');
-                                        } catch (err) {
-                                          console.error('Failed to download image:', err);
-                                          showToast(t('common.downloadFailed'), 'error');
-                                        }
-                                      }}
-                                      className="p-1.5 rounded-lg bg-black/60 text-white hover:bg-black/80 transition-colors"
-                                      title={t('common.download', '下载图片')}
-                                    >
-                                      <DownloadIcon className="w-4 h-4" />
-                                    </button>
-                                </div>
-                              </div>
-                            ) : (
-                              renderAiResponseContent(aiResponse)
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               </div>
               {/* Action buttons - sticky bottom */}
@@ -2533,16 +1733,6 @@ function PromptSkillMainContent() {
                   >
                     {copied ? <CheckIcon className="w-4 h-4" /> : <CopyIcon className="w-4 h-4" />}
                     <span>{copied ? t('prompt.copied') : t('prompt.copy')}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleAiTestFromTable(selectedPrompt, 'single');
-                    }}
-                    disabled={isDetailInlineEditing}
-                    className="flex items-center gap-2 h-9 px-4 rounded-lg bg-primary/90 text-white text-sm font-medium hover:bg-primary disabled:opacity-50 transition-colors"
-                  >
-                    <PlayIcon className="w-4 h-4" />
-                    <span>{t('prompt.aiTest')}</span>
                   </button>
                   <button
                     onClick={() => handleVersionHistory(selectedPrompt)}
@@ -2589,36 +1779,6 @@ function PromptSkillMainContent() {
         </Suspense>
       )}
 
-      {/* AI test modal (for List/Gallery view) */}
-      {/* AI 测试弹窗 (用于 List/Gallery 视图) */}
-      {isAiTestModalOpen && (
-        <Suspense fallback={null}>
-          <AiTestModal
-            isOpen={isAiTestModalOpen}
-            onClose={() => {
-              setIsAiTestModalOpen(false);
-              setAiTestPrompt(null);
-            }}
-            prompt={aiTestPrompt}
-            initialMode={aiTestInitialMode}
-            onUsageIncrement={handleAiUsageIncrement}
-            onSaveResponse={handleSaveAiResponse}
-            onAddImage={async (fileName) => {
-              // Add generated image to the currently tested prompt
-              // 将生成的图片添加到当前测试的 Prompt
-              if (aiTestPrompt) {
-                const newImages = [...(aiTestPrompt.images || []), fileName];
-                await updatePrompt(aiTestPrompt.id, { images: newImages });
-                setAiTestPrompt({
-                  ...aiTestPrompt,
-                  images: newImages,
-                });
-              }
-            }}
-          />
-        </Suspense>
-      )}
-
       {/* Detail modal (for List/Gallery view) */}
       {/* 查看详情弹窗 (用于 List/Gallery 视图) */}
       {isDetailModalOpen && (
@@ -2655,44 +1815,6 @@ function PromptSkillMainContent() {
               setTimeout(() => setCopied(false), 2000);
               setIsVariableModalOpen(false);
             }}
-          />
-        </Suspense>
-      )}
-
-      {/* Variable input modal (AI test) - choose content by language mode */}
-      {/* 变量输入弹窗（用于 AI 测试） - 根据语言模式选择内容 */}
-      {selectedPrompt && (
-        <Suspense fallback={null}>
-          <VariableInputModal
-            isOpen={isAiTestVariableModalOpen}
-            onClose={() => setIsAiTestVariableModalOpen(false)}
-            promptId={selectedPrompt.id}
-            systemPrompt={showEnglish ? (selectedPrompt.systemPromptEn || selectedPrompt.systemPrompt) : selectedPrompt.systemPrompt}
-            userPrompt={showEnglish ? (selectedPrompt.userPromptEn || selectedPrompt.userPrompt) : selectedPrompt.userPrompt}
-            mode="aiTest"
-            onAiTest={(filledSystemPrompt, filledUserPrompt, outputFormat, imageAttachments) => {
-              runAiTest(filledSystemPrompt, filledUserPrompt, undefined, outputFormat, imageAttachments);
-            }}
-            isAiTesting={isTestingAI}
-          />
-        </Suspense>
-      )}
-
-      {/* Variable input modal (multi-model compare) - choose content by language mode */}
-      {/* 变量输入弹窗（用于多模型对比） - 根据语言模式选择内容 */}
-      {selectedPrompt && (
-        <Suspense fallback={null}>
-          <VariableInputModal
-            isOpen={isCompareVariableModalOpen}
-            onClose={() => setIsCompareVariableModalOpen(false)}
-            promptId={selectedPrompt.id}
-            systemPrompt={showEnglish ? (selectedPrompt.systemPromptEn || selectedPrompt.systemPrompt) : selectedPrompt.systemPrompt}
-            userPrompt={showEnglish ? (selectedPrompt.userPromptEn || selectedPrompt.userPrompt) : selectedPrompt.userPrompt}
-            mode="aiTest"
-            onAiTest={(filledSystemPrompt, filledUserPrompt, _outputFormat, imageAttachments) => {
-              runModelCompare(filledSystemPrompt, filledUserPrompt, imageAttachments);
-            }}
-            isAiTesting={isComparingModels}
           />
         </Suspense>
       )}

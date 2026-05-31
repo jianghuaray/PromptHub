@@ -5,33 +5,20 @@ import {
   PaletteIcon,
   DatabaseIcon,
   InfoIcon,
-  GlobeIcon,
   ArrowLeftIcon,
-  BrainIcon,
-  KeyIcon,
-  KeyboardIcon,
-  ServerCogIcon,
   SparklesIcon,
   FolderIcon,
   SearchIcon,
-  CloudIcon,
   DownloadIcon,
-  TerminalSquareIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { GeneralSettings } from "./GeneralSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { LanguageSettings } from "./LanguageSettings";
-import { SecuritySettings } from "./SecuritySettings";
-import { ShortcutsSettings } from "./ShortcutsSettings";
 import { AboutSettings } from "./AboutSettings";
-import { CLISettings } from "./CLISettings";
 import { DataSettings } from "./DataSettings";
 import type { DataSettingsSubsectionId } from "./DataSettings";
-import { AISettingsPrototype } from "./AISettingsPrototype";
 import { SkillSettings } from "./SkillSettings";
-import { WebDeviceSettings } from "./WebDeviceSettings";
-import { WebWorkspaceSettings } from "./WebWorkspaceSettings";
 import { useSettingsStore } from "../../stores/settings.store";
 import { isWebRuntime } from "../../runtime";
 
@@ -52,20 +39,12 @@ const DESKTOP_SETTINGS_MENU = [
   { id: "appearance", labelKey: "settings.appearance", icon: PaletteIcon },
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
   { id: "skill", labelKey: "settings.skill", icon: SparklesIcon },
-  { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
-  { id: "shortcuts", labelKey: "settings.shortcuts", icon: KeyboardIcon },
-  { id: "security", labelKey: "settings.security", icon: KeyIcon },
-  { id: "cli", labelKey: "settings.cliTitle", icon: TerminalSquareIcon },
   { id: "about", labelKey: "settings.about", icon: InfoIcon },
 ];
 
 const WEB_SETTINGS_MENU = [
-  { id: "web", labelKey: "settings.webWorkspace", icon: ServerCogIcon },
-  { id: "devices", labelKey: "settings.deviceManagement", icon: SettingsIcon },
   { id: "appearance", labelKey: "settings.appearance", icon: PaletteIcon },
   { id: "data", labelKey: "settings.data", icon: DatabaseIcon },
-  { id: "ai", labelKey: "settings.ai", icon: BrainIcon },
-  { id: "language", labelKey: "settings.language", icon: GlobeIcon },
   { id: "about", labelKey: "settings.about", icon: InfoIcon },
 ] as const;
 
@@ -100,30 +79,6 @@ const DATA_SETTINGS_SUBMENU_GROUPS: Array<{
     ],
   },
   {
-    labelKey: "settings.dataSubmenuCloudBackup",
-    fallback: "Cloud backup settings",
-    items: [
-      {
-        id: "selfHosted",
-        labelKey: "settings.selfHostedSyncMenu",
-        fallback: "Self-Hosted PromptHub",
-        icon: ServerCogIcon,
-      },
-      {
-        id: "webdav",
-        labelKey: "settings.webdavSyncMenu",
-        fallback: "WebDAV",
-        icon: CloudIcon,
-      },
-      {
-        id: "s3",
-        labelKey: "settings.s3SyncMenu",
-        fallback: "S3 Compatible Storage",
-        icon: DatabaseIcon,
-      },
-    ],
-  },
-  {
     labelKey: "settings.dataSubmenuImportExport",
     fallback: "Import and export settings",
     items: [
@@ -147,7 +102,7 @@ export function SettingsPage({ onBack, backupImportController }: SettingsPagePro
   );
   const s3StorageEnabled = useSettingsStore((state) => state.s3StorageEnabled);
   const [activeSection, setActiveSection] = useState(
-    webRuntime ? "web" : "general",
+    webRuntime ? "appearance" : "general",
   );
   const [activeDataSubsection, setActiveDataSubsection] =
     useState<DataSettingsSubsectionId>("local");
@@ -155,16 +110,10 @@ export function SettingsPage({ onBack, backupImportController }: SettingsPagePro
 
   const renderContent = () => {
     switch (activeSection) {
-      case "web":
-        return <WebWorkspaceSettings onNavigate={setActiveSection} />;
-      case "devices":
-        return <WebDeviceSettings />;
       case "general":
         return <GeneralSettings />;
       case "appearance":
         return <AppearanceSettings />;
-      case "security":
-        return <SecuritySettings />;
       case "data":
         return (
           <DataSettings
@@ -174,16 +123,8 @@ export function SettingsPage({ onBack, backupImportController }: SettingsPagePro
         );
       case "skill":
         return <SkillSettings />;
-      case "ai":
-        return <AISettingsPrototype />;
-      case "language":
-        return <LanguageSettings />;
-      case "shortcuts":
-        return <ShortcutsSettings />;
       case "about":
         return <AboutSettings />;
-      case "cli":
-        return <CLISettings />;
     }
   };
   const activeSubmenu =

@@ -153,10 +153,6 @@ export function getSkillsDir(): string {
   );
 }
 
-export function getRulesDir(): string {
-  return path.join(getDataDir(), "rules");
-}
-
 export function getLegacyWorkspaceDir(): string {
   return path.join(getUserDataPath(), "workspace");
 }

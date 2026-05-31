@@ -10,9 +10,6 @@ import {
   CuboidIcon,
   LoaderIcon,
   CheckIcon,
-  SparklesIcon,
-  AlertCircleIcon,
-  BrainIcon,
   UploadIcon,
   Maximize2Icon,
   Minimize2Icon,
@@ -26,14 +23,8 @@ import remarkGfm from "remark-gfm";
 import rehypeSanitize from "rehype-sanitize";
 import rehypeHighlight from "rehype-highlight";
 import { useSkillStore } from "../../stores/skill.store";
-import { useSettingsStore } from "../../stores/settings.store";
 import { loadGitHubSkillRepo } from "../../services/github-skill-store";
 import { isGitHubHost, parseGitRepo } from "@prompthub/shared/utils/git-repo";
-import {
-  generateSkillContent,
-  polishSkillContent,
-  AIConfig,
-} from "../../services/ai";
 import { BUILTIN_SKILL_REGISTRY } from "@prompthub/shared/constants/skill-registry";
 import { UnsavedChangesDialog } from "../ui/UnsavedChangesDialog";
 import { SkillIconPicker } from "./SkillIconPicker";
@@ -46,7 +37,7 @@ interface CreateSkillModalProps {
   onClose: () => void;
 }
 
-type CreateMode = "select" | "github" | "manual" | "scan" | "ai";
+type CreateMode = "select" | "github" | "manual" | "scan";
 
 function sanitizeSkillName(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9-]/g, "");
@@ -64,13 +55,8 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
   );
   const existingSkills = useSkillStore((state) => state.skills);
 
-  // AI settings for generation
-  // AI 生成设置
-  const aiModels = useSettingsStore((state) => state.aiModels);
-
   const [mode, setMode] = useState<CreateMode>("select");
   const [isLoading, setIsLoading] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
@@ -194,29 +180,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
     [annotatedGitHubResults],
   );
 
-  // Get default chat model for AI generation
-  // 获取默认对话模型用于 AI 生成
-  const defaultChatModel = useMemo(() => {
-    const chatModels = aiModels.filter((m) => (m.type ?? "chat") === "chat");
-    return chatModels.find((m) => m.isDefault) ?? chatModels[0] ?? null;
-  }, [aiModels]);
-
-  // Check if AI generation is available
-  // 检查 AI 生成是否可用
-  const canGenerateWithAI = useMemo(() => {
-    return (
-      defaultChatModel && defaultChatModel.apiKey && defaultChatModel.apiUrl
-    );
-  }, [defaultChatModel]);
-
-  // Get skill-creator content from registry for use as system prompt
-  const skillCreatorContent = useMemo(() => {
-    const creator = BUILTIN_SKILL_REGISTRY.find(
-      (s) => s.slug === "skill-creator",
-    );
-    return creator?.content || null;
-  }, []);
-
   // Fullscreen handlers (must be before early return to maintain hooks order)
   const handleEnterNativeFullscreen = useCallback(() => {
     setIsNativeFullscreen(true);
@@ -255,7 +218,7 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
   };
 
   const handleCloseRequest = () => {
-    if (hasUnsavedChanges() && (mode === "manual" || mode === "ai")) {
+    if (hasUnsavedChanges() && mode === "manual") {
       setShowUnsavedDialog(true);
     } else {
       handleClose();
@@ -284,7 +247,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
     setInstrTab("edit");
     setIsFullscreen(false);
     setIsNativeFullscreen(false);
-    setIsGenerating(false);
     setScanResults([]);
     setSelectedScanItems(new Set());
     setIsScanning(false);
@@ -338,119 +300,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
     if (e.key === "Enter") {
       e.preventDefault();
       handleAddTag();
-    }
-  };
-
-  // AI Polish SKILL.md content
-  // AI 润色 SKILL.md 内容
-  const handleAIPolish = async () => {
-    if (!instructions.trim()) {
-      setError(
-        t(
-          "skill.polishNeedsContent",
-          "Please write some content first before polishing",
-        ),
-      );
-      return;
-    }
-
-    if (!defaultChatModel) {
-      setError(
-        t(
-          "skill.noAiModelConfigured",
-          "Please configure an AI model in settings first",
-        ),
-      );
-      return;
-    }
-
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      const config: AIConfig = {
-        provider: defaultChatModel.provider,
-        apiProtocol: defaultChatModel.apiProtocol,
-        apiKey: defaultChatModel.apiKey,
-        apiUrl: defaultChatModel.apiUrl,
-        model: defaultChatModel.model,
-        chatParams: defaultChatModel.chatParams,
-      };
-
-      const polished = await polishSkillContent(
-        config,
-        instructions,
-        name || undefined,
-      );
-      setInstructions(polished);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t("skill.polishFailed", "Failed to polish skill content"),
-      );
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // AI mode: generate a draft, then switch to manual review mode
-  const handleAICreate = async () => {
-    const normalizedName = sanitizeSkillName(name);
-    if (!normalizedName.trim()) {
-      setError(t("skill.nameRequired", "Please enter a skill name"));
-      return;
-    }
-    if (!description.trim()) {
-      setError(
-        t(
-          "skill.descriptionRequired",
-          "Please enter a skill description for AI generation",
-        ),
-      );
-      return;
-    }
-    if (!defaultChatModel) {
-      setError(
-        t(
-          "skill.noAiModelConfigured",
-          "Please configure an AI model in settings first",
-        ),
-      );
-      return;
-    }
-
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      const config: AIConfig = {
-        provider: defaultChatModel.provider,
-        apiProtocol: defaultChatModel.apiProtocol,
-        apiKey: defaultChatModel.apiKey,
-        apiUrl: defaultChatModel.apiUrl,
-        model: defaultChatModel.model,
-        chatParams: defaultChatModel.chatParams,
-      };
-
-      const generated = await generateSkillContent(
-        config,
-        normalizedName,
-        description,
-        undefined,
-        skillCreatorContent || undefined,
-      );
-      setName(normalizedName);
-      setInstructions(generated);
-      setMode("manual");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : t("skill.generateFailed", "Failed to generate skill content"),
-      );
-    } finally {
-      setIsGenerating(false);
     }
   };
 
@@ -952,9 +801,7 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
                   ? t("skill.installFromGithub", "Install from Git Repository")
                   : mode === "manual"
                     ? t("skill.createTitle", "Create Skill")
-                    : mode === "ai"
-                      ? t("skill.aiCreate", "AI Draft")
-                      : t("skill.scanLocal", "Scan Local")}
+                    : t("skill.scanLocal", "Scan Local")}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -1008,30 +855,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
                   "Choose how you want to add a new skill:",
                 )}
               </p>
-
-              {/* AI Create Option */}
-              <button
-                onClick={() => setMode("ai")}
-                className="w-full flex items-center gap-4 p-4 bg-primary/5 hover:bg-primary/10 border border-primary/30 rounded-xl transition-colors group text-left"
-              >
-                <div className="p-3 bg-primary rounded-lg">
-                  <BrainIcon className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-medium text-foreground flex items-center gap-2">
-                    {t("skill.aiCreate", "AI Draft")}
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary font-normal">
-                      skill-creator
-                    </span>
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t(
-                      "skill.aiCreateDesc",
-                      "Describe what you need, AI drafts the SKILL.md for review",
-                    )}
-                  </p>
-                </div>
-              </button>
 
               {/* GitHub Option */}
               <button
@@ -1432,45 +1255,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
                       <UploadIcon className="w-3.5 h-3.5" />
                       {t("skill.uploadMd", "Upload .md")}
                     </button>
-                    {/* AI Polish Button */}
-                    <button
-                      onClick={handleAIPolish}
-                      disabled={
-                        isGenerating ||
-                        !canGenerateWithAI ||
-                        !instructions.trim()
-                      }
-                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                        canGenerateWithAI
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                          : "bg-muted text-muted-foreground cursor-not-allowed"
-                      }`}
-                      title={
-                        !canGenerateWithAI
-                          ? t(
-                              "skill.configureAiFirst",
-                              "Please configure AI model in settings first",
-                            )
-                          : !instructions.trim()
-                            ? t(
-                                "skill.polishNeedsContent",
-                                "Write some content first",
-                              )
-                            : t(
-                                "skill.aiPolishHint",
-                                "Polish content to SKILL.md standard format",
-                              )
-                      }
-                    >
-                      {isGenerating ? (
-                        <LoaderIcon className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <SparklesIcon className="w-3.5 h-3.5" />
-                      )}
-                      {isGenerating
-                        ? t("skill.polishing", "Polishing...")
-                        : t("skill.aiPolish", "AI Polish")}
-                    </button>
                     {/* Edit/Preview tabs */}
                     <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
                       <button
@@ -1504,17 +1288,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
                     </button>
                   </div>
                 </div>
-                {!canGenerateWithAI && (
-                  <div className="flex items-center gap-2 mb-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                    <AlertCircleIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      {t(
-                        "skill.aiGenerateHint",
-                        "Configure an AI model in settings to enable AI generation",
-                      )}
-                    </p>
-                  </div>
-                )}
                 {instrTab === "edit" ? (
                   <textarea
                     ref={textareaRef}
@@ -1565,97 +1338,6 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-            </div>
-          )}
-
-          {mode === "ai" && (
-            <div className="space-y-4">
-              <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
-                <p className="text-xs text-primary flex items-center gap-2">
-                  <BrainIcon className="w-3.5 h-3.5" />
-                  {t(
-                    "skill.aiCreateHint",
-                    "Uses the Skill Creator skill to draft a professional SKILL.md. You can review and edit before saving.",
-                  )}
-                </p>
-              </div>
-
-              {!canGenerateWithAI && (
-                <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                  <AlertCircleIcon className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                  <p className="text-xs text-amber-600 dark:text-amber-400">
-                    {t(
-                      "skill.aiGenerateHint",
-                      "Configure an AI model in settings to enable AI generation",
-                    )}
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t("skill.name", "Name")}
-                  <span className="ml-1 text-destructive">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(sanitizeSkillName(e.target.value))}
-                  placeholder={t("skill.namePlaceholder", "my-skill")}
-                  className="w-full px-4 py-2.5 bg-muted/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  {t(
-                    "skill.nameHint",
-                    "Lowercase letters, numbers, and hyphens only, e.g. my-skill-name",
-                  )}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
-                  {t("skill.description", "Description")}
-                  <span className="ml-1 text-destructive">*</span>
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder={t(
-                    "skill.aiDescPlaceholder",
-                    "Describe what this skill should do, its purpose, and when to use it...",
-                  )}
-                  rows={4}
-                  className="w-full px-4 py-2.5 bg-muted/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setMode("select")}
-                  className="flex-1 px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
-                >
-                  {t("common.back", "Back")}
-                </button>
-                <button
-                  onClick={handleAICreate}
-                  disabled={
-                    isGenerating ||
-                    !canGenerateWithAI ||
-                    !name.trim() ||
-                    !description.trim()
-                  }
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
-                >
-                  {isGenerating ? (
-                    <LoaderIcon className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <SparklesIcon className="w-4 h-4" />
-                  )}
-                  {isGenerating
-                    ? t("skill.generating", "Generating...")
-                    : t("skill.generateAndReview", "Generate & Review")}
-                </button>
-              </div>
             </div>
           )}
 
@@ -2116,9 +1798,9 @@ export function CreateSkillModal({ isOpen, onClose }: CreateSkillModalProps) {
             >
               {t("common.back", "Back")}
             </button>
-            <button
-              onClick={handleManualCreate}
-              disabled={isLoading || isGenerating || !name.trim()}
+              <button
+                onClick={handleManualCreate}
+              disabled={isLoading || !name.trim()}
               className="flex items-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
             >
               {isLoading ? (

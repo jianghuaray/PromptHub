@@ -65,7 +65,7 @@ const DEFAULT_BACKGROUND_IMAGE_OPACITY = 1;
 const DEFAULT_BACKGROUND_IMAGE_BLUR = 0;
 const LEGACY_BACKGROUND_IMAGE_BLUR_DEFAULT = 14;
 const LOCAL_IMAGE_PROTOCOL_PREFIX = "local-image://";
-export const DESKTOP_HOME_MODULES = ["prompt", "skill", "rules"] as const;
+export const DESKTOP_HOME_MODULES = ["prompt", "skill"] as const;
 export type DesktopHomeModule = (typeof DESKTOP_HOME_MODULES)[number];
 const createProjectRecordId = (): string =>
   `project_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -808,12 +808,6 @@ function syncSettingsToMain(settings: Partial<Settings>): void {
     .catch((error: unknown) =>
       console.warn("Failed to sync settings to main process:", error),
     );
-}
-
-function refreshRulesWorkspace(): void {
-  void import("./rules.store").then(({ useRulesStore }) => {
-    void useRulesStore.getState().loadFiles({ force: true });
-  });
 }
 
 function sanitizeGithubToken(token: string): string {
@@ -1635,7 +1629,6 @@ export const useSettingsStore = create<SettingsState>()(
             customAgents: normalizedAgents,
             customAgentRootPaths: nextPaths,
           });
-          refreshRulesWorkspace();
         },
         addCustomAgent: (input) => {
           const nextAgent = normalizeCustomAgentDraft(input);
@@ -1879,7 +1872,6 @@ export const useSettingsStore = create<SettingsState>()(
             builtinAgentOverrides: normalizedOverrides,
             customPlatformRootPaths: nextLegacyRootPaths,
           });
-          refreshRulesWorkspace();
         },
         resetBuiltinAgentOverride: (platformId) => {
           const nextOverrides = { ...get().builtinAgentOverrides };
@@ -1896,7 +1888,6 @@ export const useSettingsStore = create<SettingsState>()(
             builtinAgentOverrides: normalizedOverrides,
             customPlatformRootPaths: nextLegacyRootPaths,
           });
-          refreshRulesWorkspace();
         },
         setCustomPlatformRootPath: (platformId, pathValue) => {
           get().updateBuiltinAgentOverride(platformId, { rootPath: pathValue });
@@ -1915,7 +1906,6 @@ export const useSettingsStore = create<SettingsState>()(
           );
           setTouched({ disabledPlatformIds: normalized });
           syncSettingsToMain({ disabledPlatformIds: normalized });
-          refreshRulesWorkspace();
         },
         setRulePlatformTracked: (platformId, tracked) => {
           const disabledIds = new Set(get().disabledPlatformIds);
@@ -1927,7 +1917,6 @@ export const useSettingsStore = create<SettingsState>()(
           const normalized = Array.from(disabledIds);
           setTouched({ disabledPlatformIds: normalized });
           syncSettingsToMain({ disabledPlatformIds: normalized });
-          refreshRulesWorkspace();
         },
         setCustomSkillPlatformPath: (platformId, pathValue) => {
           get().setCustomPlatformRootPath(platformId, pathValue);

@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StarIcon, CopyIcon, PlayIcon, EditIcon, TrashIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, FolderIcon, Trash2Icon } from 'lucide-react';
+import { StarIcon, CopyIcon, EditIcon, TrashIcon, CheckIcon, ChevronLeftIcon, ChevronRightIcon, HistoryIcon, FolderIcon, Trash2Icon } from 'lucide-react';
 import type { Prompt } from '@prompthub/shared/types';
 import { useFolderStore } from '../../stores/folder.store';
 import { useTableConfig, type ColumnConfig } from '../../hooks/useTableConfig';
@@ -64,7 +64,6 @@ interface PromptTableViewProps {
   onCopy: (prompt: Prompt) => void;
   onEdit: (prompt: Prompt) => void;
   onDelete: (prompt: Prompt) => void;
-  onAiTest: (prompt: Prompt) => void;
   onVersionHistory: (prompt: Prompt) => void;
   onViewDetail: (prompt: Prompt) => void;
   // aiResults: promptId -> AI response
@@ -86,7 +85,6 @@ export function PromptTableView({
   onCopy,
   onEdit,
   onDelete,
-  onAiTest,
   onVersionHistory,
   onViewDetail,
   aiResults = {},
@@ -513,15 +511,6 @@ export function PromptTableView({
                               ) : (
                                 <CopyIcon className="w-4 h-4" />
                               )}
-                            </button>
-
-                            {/* AI test */}
-                            <button
-                              onClick={() => onAiTest(prompt)}
-                              className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                              title={t('prompt.aiTest')}
-                            >
-                              <PlayIcon className="w-4 h-4" />
                             </button>
 
                             {/* Version history */}

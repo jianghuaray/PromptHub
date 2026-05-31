@@ -99,10 +99,9 @@ export function useBackupImportController() {
     setConfirmingImport(true);
     try {
       if (!isWebRuntime()) {
-        const currentVersion = await window.electron?.updater?.getVersion?.();
         await createUpgradeBackup({
-          fromVersion: currentVersion || undefined,
-          toVersion: currentVersion || undefined,
+          fromVersion: undefined,
+          toVersion: undefined,
         });
       }
 

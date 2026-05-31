@@ -1,4 +1,201 @@
-# PromptHub — Project Context & Development Rules
+# PromptHub — Local Agent Handoff & Project Overview
+
+This file is the shared handoff surface for coding agents working in this
+local PromptHub checkout. Keep it current when a completed change alters the
+core product direction, app architecture, feature scope, build path, or agent
+workflow.
+
+## 0. Current Local Goal
+
+The user is simplifying the upstream GitHub PromptHub project into a personal
+macOS desktop app.
+
+The simplified app must remain a real Electron desktop application that can be
+packaged into a macOS `.dmg`. Do not turn this into a web-only app, a CLI-only
+tool, or a partial prototype that cannot be packaged.
+
+### Core Features To Preserve
+
+These are the user's core workflows. Treat them as protected unless the user
+explicitly changes direction:
+
+- Prompt management: create, edit, organize, tag, search, copy, and keep prompt
+  version history.
+- Skill management: create, edit, import, scan local `SKILL.md` files, inspect
+  skill content, and keep skill version history.
+- Multi-platform Skill distribution: install/deploy/sync Skills into supported
+  AI coding tool platforms such as Claude Code, Codex, Cursor, Windsurf,
+  Gemini CLI, Kilo Code, and similar configured targets.
+- macOS packaging: keep `pnpm electron:build:mac` working and verify that a
+  `.dmg` can be generated before calling a simplification milestone complete.
+
+### Features That Are Not Core For The User
+
+These can be hidden, disabled, or removed during simplification, provided the
+protected core workflows and macOS packaging keep working:
+
+- Self-hosted Web app and web-server product surface.
+- Standalone CLI product surface and desktop CLI installer management.
+- Public marketing/docs website.
+- WebDAV, S3, and self-hosted PromptHub sync.
+- AI prompt testing, AI prompt generation, AI Skill drafting, and AI rewrite or
+  polish flows.
+- Rules management for `AGENTS.md`, `CLAUDE.md`, `.cursor/rules`, etc., unless
+  the user later says this is needed.
+- Auto-update flows for public releases.
+- Advanced appearance features such as background image, animation tuning, and
+  nonessential UI customization.
+- Extra locales beyond the language(s) the user chooses to keep.
+
+### Simplification Strategy
+
+Prefer staged simplification over large deletions:
+
+1. First narrow the desktop UI to Prompt, Skill, and multi-platform Skill
+   distribution while leaving the build structure intact.
+2. Then remove unused renderer UI, preload APIs, IPC handlers, main-process
+   services, dependencies, and tests by feature area.
+3. Only after the desktop app still builds should agents remove outer product
+   packages such as `apps/web`, `apps/cli`, and `website`.
+4. After each meaningful stage, run focused checks first, then `pnpm build` or
+   `pnpm --filter @prompthub/desktop build`; before final completion run
+   `pnpm electron:build:mac`.
+
+Do not remove the Electron/Vite/electron-builder chain unless replacing it with
+an equally working macOS packaging chain approved by the user.
+
+### Current Simplification Status
+
+- Stage 1 desktop surface narrowing is in progress/completed for the visible
+  shell:
+  - Default desktop modules are now Prompt and Skill only.
+  - Settings now exposes General, Appearance, Data, Skill, and About.
+  - Data Settings no longer exposes WebDAV, S3, or self-hosted PromptHub sync
+    subsections.
+  - Top bar Prompt creation now opens the manual Prompt modal instead of
+    AI/Quick Add.
+  - Top bar public update notification is hidden.
+  - Rules has been removed from renderer-level main content routing, top bar
+    search, and sidebar panel code.
+  - Prompt screens no longer show the main AI test actions in the context menu,
+    table view, kanban view, detail action bar, or AI test modal entry.
+  - Skill creation no longer shows AI Draft or AI Polish entry points.
+  - Prompt detail/list unreachable AI test execution code has been removed from
+    the renderer.
+  - Skill creation unreachable AI draft/polish execution code has been removed
+    from the renderer.
+  - Settings no longer dynamically imports `rules.store`, and visible Rules
+    export/path settings have been removed from Data/Skill settings.
+  - Desktop preload/main no longer expose or register Rules/CLI APIs. Orphan
+    Rules/CLI renderer files and desktop Rules/CLI service files were deleted.
+  - Desktop backup/import no longer collects or restores Rules data.
+  - Desktop auto-update has been removed from the renderer, preload, and main
+    process. About settings no longer exposes update checks or preview-channel
+    controls.
+  - Desktop background/startup/save cloud sync behavior is disabled. WebDAV,
+    S3, and self-hosted sync no longer run automatically after launch, on a
+    timer, after window resume, or after local Prompt/Folder saves.
+  - Desktop main/preload no longer register or expose WebDAV/S3 IPC. The
+    unused main-process WebDAV/S3 service files were deleted.
+- Verified during Stage 1 and current Stage 2 renderer cleanup:
+  - `pnpm install`
+  - `pnpm --filter @prompthub/desktop build`
+  - `pnpm --filter @prompthub/desktop typecheck`
+  - `pnpm electron:build:mac`, producing x64 and arm64 `.dmg` files under
+    `apps/desktop/dist/`.
+- Important remaining Stage 2 work:
+  - Delete the remaining hidden WebDAV/S3/self-hosted sync settings and
+    renderer service files after focused checks.
+  - Remove AI IPC/service chains after visible and unreachable AI UI paths are
+    fully gone.
+  - Only remove `apps/web`, `apps/cli`, and `website` after the desktop app
+    still builds cleanly without their shared dependencies.
+
+## 1. Current Repository Shape
+
+This checkout is a monorepo, not the older single `src/` layout described in
+some upstream docs.
+
+- `apps/desktop/`: primary Electron desktop app. This is the simplification
+  target and must keep building as a macOS app.
+- `apps/desktop/src/main/`: Electron main process, native integration, IPC
+  registration, data path handling, updater, security, sync, and service logic.
+- `apps/desktop/src/preload/`: context bridge APIs exposed to the renderer.
+- `apps/desktop/src/renderer/`: React UI, Zustand stores, renderer services,
+  i18n, Prompt/Skill/Settings/Layout components.
+- `packages/shared/`: shared types, constants, IPC channel names, platform
+  registries, and utility types.
+- `packages/db/`: shared SQLite database layer used by desktop/web/CLI.
+- `packages/core/`: shared core services, including CLI and rules/platform
+  helpers.
+- `apps/web/`: self-hosted web product. Non-core for the user's simplified Mac
+  app.
+- `apps/cli/`: standalone CLI product. Non-core for the user's simplified Mac
+  app unless the user later says otherwise.
+- `website/`: public website/docs surface. Non-core for the simplified Mac app.
+- `spec/`: internal project specs, change records, rules, and knowledge docs.
+- `docs/`: repository-facing documentation and images.
+
+Key packaging files:
+
+- `package.json`: root scripts and workspace entry.
+- `pnpm-workspace.yaml`: workspace package list.
+- `apps/desktop/package.json`: desktop scripts, including
+  `electron:build:mac`.
+- `apps/desktop/electron-builder.json`: macOS `.dmg`/`.zip` packaging config.
+- `apps/desktop/vite.config.ts`: renderer/main/preload build configuration.
+
+## 2. Agent Handoff Rules
+
+When a new agent starts in this repository:
+
+1. Read this file first.
+2. Check `git status --short` before editing. Never revert changes you did not
+   make unless the user explicitly asks.
+3. Treat Prompt management, Skill management, multi-platform Skill
+   distribution, and macOS `.dmg` packaging as the protected product core.
+4. If the task is exploratory or the user is unsure, discuss the plan before
+   editing. If the user explicitly asks to implement, keep changes scoped.
+5. For non-trivial feature removals/refactors, create or update a change folder
+   under `spec/changes/active/<change-key>/` before code changes, following the
+   spec workflow below.
+6. Update this `AGENTS.md` after completing any core directional change, such
+   as changing the protected feature set, removing an app/package, changing the
+   packaging command, or altering the simplification strategy.
+7. Record what was verified. A simplification is not complete merely because
+   files were deleted; the desktop app must still build, and final milestones
+   must prove macOS packaging.
+8. Prefer Chinese for project handoff files, change records, plans, and user
+   explanations unless a file is clearly upstream-facing English documentation.
+9. The user does not understand programming details. Explain work in product
+   terms first, keep technical terms short, and translate why a change matters
+   instead of only naming files or APIs.
+
+## 3. Useful Commands
+
+Use workspace-aware commands:
+
+| Command                                      | Description                                  |
+| :------------------------------------------- | :------------------------------------------- |
+| `pnpm install`                               | Install dependencies                         |
+| `pnpm electron:dev`                          | Start desktop dev environment                |
+| `pnpm build`                                 | Build the desktop app via the root script    |
+| `pnpm --filter @prompthub/desktop build`     | Build only the desktop app                   |
+| `pnpm electron:build:mac`                    | Build macOS `.dmg` and `.zip` desktop assets |
+| `pnpm --filter @prompthub/desktop typecheck` | Type-check the desktop app                   |
+| `pnpm --filter @prompthub/desktop lint`      | Lint the desktop app                         |
+| `pnpm --filter @prompthub/desktop test:unit` | Run desktop unit tests                       |
+
+Prefer focused checks while actively editing, then broader checks before
+declaring completion.
+
+---
+
+# PromptHub — Upstream Project Context & Development Rules
+
+The sections below contain upstream/project rules that still matter. Some path
+examples may describe the older single-app layout; for this checkout, prefer the
+monorepo paths documented above when they conflict.
 
 ## 1. Project Overview
 
