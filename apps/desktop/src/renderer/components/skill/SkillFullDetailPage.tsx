@@ -43,7 +43,6 @@ import {
   formatSkillSafetyScanError,
   formatSkillTranslationError,
   getErrorMessage,
-  getSafetyScanAIConfig,
   groupSkillSafetyFindings,
   resolveSkillDescription,
 } from "./detail-utils";
@@ -54,7 +53,6 @@ import {
   writeSkillTranslationSidecar,
   type SkillTranslationSidecar,
 } from "../../services/skill-translation-sidecar";
-import { scheduleAllSaveSync } from "../../services/webdav-save-sync";
 import { useSkillPlatform } from "./use-skill-platform";
 import { SkillVersionHistoryModal } from "./SkillVersionHistoryModal";
 import type { SkillSafetyReport } from "@prompthub/shared/types";
@@ -146,7 +144,6 @@ export function SkillFullDetailPage({
     (state) => state.autoScanInstalledSkills,
   );
   const skillProjects = useSettingsStore((state) => state.skillProjects);
-  const aiModels = useSettingsStore((state) => state.aiModels);
   const updateSkillProject = useSettingsStore((state) => state.updateSkillProject);
   const [installMode, setInstallMode] = useState<InstallMode>(
     () => skillInstallMethod,
@@ -498,7 +495,6 @@ export function SkillFullDetailPage({
           sourceUrl: selectedSkill.source_url,
           contentUrl: selectedSkill.content_url,
           localRepoPath: selectedSkill.local_repo_path,
-          aiConfig: getSafetyScanAIConfig(aiModels),
         });
         if (!cancelled) {
           setSafetyReport(report);
@@ -526,7 +522,6 @@ export function SkillFullDetailPage({
       cancelled = true;
     };
   }, [
-    aiModels,
     autoScanInstalledSkills,
     resolvedSkillMdContent,
     selectedSkill,
@@ -644,7 +639,6 @@ export function SkillFullDetailPage({
         sourceUrl: selectedSkill.source_url,
         contentUrl: selectedSkill.content_url,
         localRepoPath: selectedSkill.local_repo_path,
-        aiConfig: getSafetyScanAIConfig(aiModels),
       });
       setSafetyReport(report);
       // Persist to DB + update store
@@ -794,7 +788,6 @@ export function SkillFullDetailPage({
         selectedSkill.id,
         snapshotNote.trim() || buildDefaultSnapshotNote(),
       );
-      scheduleAllSaveSync("skill:create-snapshot");
       await loadSkills();
       setIsSnapshotModalOpen(false);
       showToast(t("skill.snapshotCreated"), "success");

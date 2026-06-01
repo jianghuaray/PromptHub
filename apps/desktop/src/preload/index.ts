@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { IPC_CHANNELS } from "@prompthub/shared/constants/ipc-channels";
-import { aiApi } from "./api/ai";
 import { folderApi } from "./api/folder";
 import { ioApi } from "./api/io";
 import { promptApi } from "./api/prompt";
@@ -101,7 +100,6 @@ const api = {
   settings: settingsApi,
   upgradeBackup: upgradeBackupApi,
   io: ioApi,
-  ai: aiApi,
 
   // Listen to main process events (with whitelist)
   // 监听主进程事件（使用白名单）

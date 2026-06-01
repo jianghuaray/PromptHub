@@ -1,4 +1,0 @@
-services:
-  prompthub-web:
-    build: !reset null
-    image: ghcr.io/legeling/prompthub-web:latest

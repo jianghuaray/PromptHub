@@ -1,4 +1,4 @@
-import { cloneElement, useMemo, useState } from "react";
+import { cloneElement } from "react";
 import type { ReactNode } from "react";
 import {
   DndContext,
@@ -22,8 +22,6 @@ import {
   MoonIcon,
   MonitorIcon,
   CheckIcon,
-  ImageIcon,
-  SlidersHorizontalIcon,
   GripVerticalIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -34,20 +32,9 @@ import {
   ThemeMode,
   DESKTOP_HOME_MODULES,
   type DesktopHomeModule,
-  getRenderedBackgroundImageBlur,
-  getRenderedBackgroundImageOpacity,
 } from "../../stores/settings.store";
 import { SettingSection } from "./shared";
 import { isWebRuntime } from "../../runtime";
-import { BackgroundImageBackdrop } from "../ui/BackgroundImageBackdrop";
-
-interface BackgroundPreviewStageProps {
-  backgroundImageFileName?: string;
-  renderedBackgroundOpacity: number;
-  renderedBackgroundBlur: number;
-  imageAlt: string;
-  emptyLabel: string;
-}
 
 interface DesktopModuleItemProps {
   moduleId: DesktopHomeModule;
@@ -117,79 +104,10 @@ function DesktopModuleItem({
   );
 }
 
-function BackgroundPreviewStage({
-  backgroundImageFileName,
-  renderedBackgroundOpacity,
-  renderedBackgroundBlur,
-  imageAlt,
-  emptyLabel,
-}: BackgroundPreviewStageProps) {
-  if (!backgroundImageFileName) {
-    return (
-      <div className="h-full w-full flex flex-col items-center justify-center gap-2 text-muted-foreground">
-        <ImageIcon className="w-8 h-8 opacity-50" />
-        <span className="text-sm">{emptyLabel}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="background-preview-stage pointer-events-none relative h-full w-full select-none overflow-hidden rounded-xl bg-background text-foreground app-background-mode-image">
-      <BackgroundImageBackdrop
-        src={backgroundImageFileName}
-        alt={imageAlt}
-        opacity={renderedBackgroundOpacity}
-        blur={renderedBackgroundBlur}
-      />
-
-      <div className="background-preview-shell relative z-10 flex h-full w-full flex-col overflow-hidden app-wallpaper-shell">
-        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border px-2.5 app-wallpaper-toolbar">
-          <div className="h-5 w-5 shrink-0 rounded-md app-wallpaper-surface" />
-          <div className="flex-1">
-            <div className="h-5 rounded-md border border-border app-wallpaper-search" />
-          </div>
-          <div className="h-5 w-5 shrink-0 rounded-md app-wallpaper-surface" />
-        </div>
-
-        <div className="flex flex-1 overflow-hidden">
-          <div className="app-left-rail-glass flex w-20 shrink-0 flex-col gap-2 border-r border-border p-2 app-wallpaper-panel-strong">
-            <div className="h-5 rounded-md app-wallpaper-surface-strong" />
-            <div className="h-4 rounded-md app-wallpaper-surface" />
-            <div className="h-4 rounded-md app-wallpaper-surface" />
-            <div className="sidebar-tag-section mt-auto h-8 rounded-lg app-wallpaper-panel" />
-          </div>
-
-          <div className="flex flex-1 overflow-hidden app-wallpaper-section">
-            <div className="prompt-list-pane flex w-28 shrink-0 flex-col border-r border-border">
-              <div className="prompt-list-header flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border px-2 app-wallpaper-toolbar">
-                <div className="h-2 w-8 rounded bg-foreground/15" />
-                <div className="prompt-list-view-toggle h-5 w-10 rounded-md border border-border app-wallpaper-surface" />
-              </div>
-
-              <div className="flex flex-1 flex-col gap-2 p-2">
-                <div className="prompt-list-card h-10 rounded-lg border border-border app-wallpaper-surface-strong" />
-                <div className="prompt-list-card h-10 rounded-lg border border-border app-wallpaper-surface" />
-                <div className="prompt-list-card h-10 rounded-lg border border-border app-wallpaper-surface" />
-              </div>
-            </div>
-
-            <div className="flex flex-1 flex-col gap-2 p-2">
-              <div className="h-8 w-24 rounded-lg app-wallpaper-surface" />
-              <div className="h-12 rounded-xl border border-border app-wallpaper-panel" />
-              <div className="flex-1 rounded-xl border border-border app-wallpaper-panel" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AppearanceSettings() {
   const { t } = useTranslation();
   const settings = useSettingsStore();
   const webRuntime = isWebRuntime();
-  const [isPickingBackground, setIsPickingBackground] = useState(false);
   const homeModules = settings.desktopHomeModules;
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -198,27 +116,6 @@ export function AppearanceSettings() {
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
-  );
-
-  const hasBackgroundImage = Boolean(settings.backgroundImageFileName);
-  const isBackgroundImageEnabled =
-    hasBackgroundImage && settings.backgroundImageEnabled;
-  const backgroundOpacityPercent = useMemo(
-    () => Math.round(settings.backgroundImageOpacity * 100),
-    [settings.backgroundImageOpacity],
-  );
-  const renderedBackgroundOpacity = useMemo(
-    () => getRenderedBackgroundImageOpacity(settings.backgroundImageOpacity),
-    [settings.backgroundImageOpacity],
-  );
-  const renderedBackgroundBlur = useMemo(
-    () => getRenderedBackgroundImageBlur(settings.backgroundImageBlur),
-    [settings.backgroundImageBlur],
-  );
-
-  const backgroundVisibilityPercent = useMemo(
-    () => Math.round(renderedBackgroundOpacity * 100),
-    [renderedBackgroundOpacity],
   );
 
   const desktopModuleMeta: Record<
@@ -255,39 +152,6 @@ export function AppearanceSettings() {
     settings.reorderDesktopHomeModules(
       arrayMove(homeModules, activeIndex, overIndex),
     );
-  };
-
-  const handleSelectBackgroundImage = async () => {
-    if (webRuntime || isPickingBackground) {
-      return;
-    }
-
-    setIsPickingBackground(true);
-    try {
-      const selectedPaths = await window.electron?.selectImage?.();
-      const nextImagePath = Array.isArray(selectedPaths)
-        ? selectedPaths[0]
-        : undefined;
-      if (!nextImagePath) {
-        return;
-      }
-
-      const savedFileNames = await window.electron?.saveImage?.([nextImagePath]);
-      const fileName = Array.isArray(savedFileNames)
-        ? savedFileNames[0]
-        : undefined;
-      if (!fileName) {
-        return;
-      }
-
-      settings.applyBackgroundImageSelection(fileName);
-    } finally {
-      setIsPickingBackground(false);
-    }
-  };
-
-  const handleToggleBackgroundImage = () => {
-    settings.setBackgroundImageEnabled(!settings.backgroundImageEnabled);
   };
 
   const themeModes: {
@@ -495,41 +359,6 @@ export function AppearanceSettings() {
         </div>
       </SettingSection>
 
-      <SettingSection title={t("settings.motion.title", "Motion")}>
-        <div className="space-y-3 p-4">
-          <p className="text-xs text-muted-foreground">
-            {t(
-              "settings.motion.desc",
-              "Control how much animation the desktop renderer plays. 'Standard' overrides the system 'reduce motion' setting.",
-            )}
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            {(
-              [
-                { id: "off", labelKey: "settings.motion.off", fallback: "Off" },
-                { id: "reduced", labelKey: "settings.motion.reduced", fallback: "Reduced" },
-                { id: "standard", labelKey: "settings.motion.standard", fallback: "Standard" },
-              ] as const
-            ).map((option) => {
-              const selected = settings.motionPreference === option.id;
-              return (
-                <button
-                  key={option.id}
-                  onClick={() => settings.setMotionPreference(option.id)}
-                  className={`py-2.5 px-4 rounded-xl text-[13px] font-medium transition-all duration-base ${
-                    selected
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
-                      : "app-settings-subtle text-foreground hover:shadow"
-                  } hover:-translate-y-0.5 active:translate-y-0`}
-                >
-                  {t(option.labelKey, option.fallback)}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </SettingSection>
-
       {!webRuntime ? (
         <SettingSection title={t("settings.desktopWorkspace", "Desktop workspace")}>
           <div className="space-y-4 p-4">
@@ -623,128 +452,6 @@ export function AppearanceSettings() {
         </SettingSection>
       ) : null}
 
-      {!webRuntime ? (
-        <SettingSection
-          title={t("settings.backgroundImage", "Background Image")}
-        >
-          <div className="p-4 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                  <ImageIcon className="w-4 h-4 text-muted-foreground" />
-                  {t("settings.backgroundImageTitle", "Desktop background")}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground leading-6">
-                  {t(
-                    "settings.backgroundImageDesc",
-                    "Choose a local image for the desktop app background. The file stays in PromptHub's image storage and only the reference is saved in settings.",
-                  )}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => void handleSelectBackgroundImage()}
-                  disabled={isPickingBackground}
-                  className="h-9 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {hasBackgroundImage
-                    ? t("settings.changeBackgroundImage", "Change image")
-                    : t("settings.selectBackgroundImage", "Choose image")}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleBackgroundImage}
-                  disabled={!hasBackgroundImage}
-                  className="h-9 px-3 rounded-lg app-wallpaper-surface border border-border text-foreground text-sm hover:bg-accent/60 transition-colors disabled:opacity-40 inline-flex items-center gap-2"
-                >
-                  {isBackgroundImageEnabled
-                    ? t("settings.disableBackgroundImage", "Disable")
-                    : t("settings.enableBackgroundImage", "Enable")}
-                </button>
-              </div>
-            </div>
-
-            {hasBackgroundImage ? (
-              <p className="text-xs text-muted-foreground">
-                {isBackgroundImageEnabled
-                  ? t(
-                      "settings.backgroundImageEnabledHint",
-                      "Background image is currently enabled for the desktop shell.",
-                    )
-                  : t(
-                      "settings.backgroundImageDisabledHint",
-                      "Background image is saved but currently disabled.",
-                    )}
-              </p>
-            ) : null}
-
-            <div className="rounded-2xl app-settings-subtle p-3 space-y-3">
-              <div className="aspect-[16/9] w-full overflow-hidden rounded-xl app-settings-input relative">
-                <BackgroundPreviewStage
-                  backgroundImageFileName={settings.backgroundImageFileName}
-                  renderedBackgroundOpacity={renderedBackgroundOpacity}
-                  renderedBackgroundBlur={renderedBackgroundBlur}
-                  imageAlt={t(
-                    "settings.backgroundImagePreviewAlt",
-                    "Background image preview",
-                  )}
-                  emptyLabel={t(
-                    "settings.backgroundImageEmpty",
-                    "No background image selected",
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <ImageIcon className="w-3.5 h-3.5" />
-                      {t("settings.backgroundImageOpacity", "Background visibility")}
-                    </span>
-                    <span>{backgroundOpacityPercent}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={backgroundOpacityPercent}
-                    onChange={(event) =>
-                      settings.setBackgroundImageOpacity(
-                        Number(event.target.value) / 100,
-                      )
-                    }
-                    className="w-full accent-primary"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <SlidersHorizontalIcon className="w-3.5 h-3.5" />
-                      {t("settings.backgroundImageBlur", "Blur strength")}
-                    </span>
-                    <span>{settings.backgroundImageBlur}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="50"
-                    step="0.5"
-                    value={settings.backgroundImageBlur}
-                    onChange={(event) =>
-                      settings.setBackgroundImageBlur(Number(event.target.value))
-                    }
-                    className="w-full accent-primary"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </SettingSection>
-      ) : null}
     </div>
   );
 }

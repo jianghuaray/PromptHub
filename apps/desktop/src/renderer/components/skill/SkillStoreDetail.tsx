@@ -29,7 +29,6 @@ import {
   formatSkillTranslationError,
   getErrorMessage,
   groupSkillSafetyFindings,
-  getSafetyScanAIConfig,
   renderImmersiveSegments,
   resolveSkillDescription,
   stripFrontmatter,
@@ -89,7 +88,6 @@ export function SkillStoreDetail({
   const autoScanBeforeInstall = useSettingsStore(
     (state) => state.autoScanStoreSkillsBeforeInstall,
   );
-  const aiModels = useSettingsStore((state) => state.aiModels);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isUninstalling, setIsUninstalling] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
@@ -179,7 +177,6 @@ export function SkillStoreDetail({
         sourceUrl: skill.source_url,
         contentUrl: skill.content_url,
         securityAudits: skill.security_audits,
-        aiConfig: getSafetyScanAIConfig(aiModels),
       });
       setSafetyReport(report);
       // If already installed, persist to DB
@@ -201,7 +198,6 @@ export function SkillStoreDetail({
       setIsScanningSafety(false);
     }
   }, [
-    aiModels,
     saveSafetyReport,
     showToast,
     skill.content,

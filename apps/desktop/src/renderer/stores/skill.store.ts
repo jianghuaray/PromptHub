@@ -20,8 +20,6 @@ import {
   BUILTIN_SKILL_REGISTRY,
   SKILL_CATEGORIES,
 } from "@prompthub/shared/constants/skill-registry";
-import { chatCompletion } from "../services/ai";
-import { resolveScenarioAIConfig } from "../services/ai-defaults";
 import {
   filterVisibleScannedSkills,
   filterVisibleSkills,
@@ -41,9 +39,7 @@ import {
   getRegistrySkillUpdateStatus,
   type RegistrySkillUpdateCheck,
 } from "../services/skill-store-update";
-import { scheduleAllSaveSync } from "../services/webdav-save-sync";
 import { useSettingsStore } from "./settings.store";
-import { getSafetyScanAIConfig } from "../components/skill/detail-utils";
 
 export type SkillFilterType =
   | "all"
@@ -713,7 +709,6 @@ export const useSkillStore = create<SkillState>()(
               selectedSkillId: storedSkill.id,
               isLoading: false,
             }));
-            scheduleAllSaveSync("skill:create");
             return storedSkill;
           }
           return null;
@@ -759,7 +754,6 @@ export const useSkillStore = create<SkillState>()(
             set((state) => ({
               skills: state.skills.map((s) => (s.id === id ? storedSkill : s)),
             }));
-            scheduleAllSaveSync("skill:update");
             return storedSkill;
           }
           return null;
@@ -798,7 +792,6 @@ export const useSkillStore = create<SkillState>()(
               selectedSkillId:
                 state.selectedSkillId === id ? null : state.selectedSkillId,
             }));
-            scheduleAllSaveSync("skill:delete");
             return true;
           }
           return false;
@@ -829,11 +822,8 @@ export const useSkillStore = create<SkillState>()(
       scanLocalPreview: async (customPaths?: string[]) => {
         set({ isLoading: true, error: null });
         try {
-          const aiConfig = getSafetyScanAIConfig(
-            useSettingsStore.getState().aiModels,
-          );
           const scannedSkills =
-            await window.api.skill.scanLocalPreview(customPaths, aiConfig);
+            await window.api.skill.scanLocalPreview(customPaths);
           set({ isLoading: false });
           return scannedSkills;
         } catch (error) {
@@ -964,7 +954,6 @@ export const useSkillStore = create<SkillState>()(
             sourceUrl: skill.source_url,
             contentUrl: skill.content_url,
             localRepoPath: skill.local_repo_path,
-            aiConfig,
           });
 
           // Attach numeric score
@@ -993,7 +982,6 @@ export const useSkillStore = create<SkillState>()(
                 s.id === skill.id ? { ...s, safetyReport: scored } : s,
               ),
             }));
-            scheduleAllSaveSync("skill:safety-report");
           } catch (err) {
             console.warn(
               `Failed to persist safety report for skill "${skill.name}":`,
@@ -1016,7 +1004,6 @@ export const useSkillStore = create<SkillState>()(
             s.id === skillId ? { ...s, safetyReport: scored } : s,
           ),
         }));
-        scheduleAllSaveSync("skill:save-safety-report");
       },
 
       installToPlatform: async (platform, name, mcpConfig) => {
@@ -1237,7 +1224,6 @@ export const useSkillStore = create<SkillState>()(
           installedSkill.id,
           `Store update: ${installedSkill.version || "unknown"} -> ${regSkill.version}`,
         );
-        scheduleAllSaveSync("skill:create-version");
 
         const now = Date.now();
         const updatedSkill = await get().updateSkill(installedSkill.id, {
@@ -1543,99 +1529,7 @@ export const useSkillStore = create<SkillState>()(
           }
         }
 
-        // Get AI config from settings store
-        const settingsState = useSettingsStore.getState();
-        const config = resolveScenarioAIConfig({
-          aiModels: settingsState.aiModels,
-          scenarioModelDefaults: settingsState.scenarioModelDefaults,
-          scenario: "translation",
-          type: "chat",
-          aiProvider: settingsState.aiProvider,
-          aiApiProtocol: settingsState.aiApiProtocol,
-          aiApiKey: settingsState.aiApiKey,
-          aiApiUrl: settingsState.aiApiUrl,
-          aiModel: settingsState.aiModel,
-        });
-
-        if (!config?.apiKey || !config.apiUrl || !config.model) {
-          throw new Error("AI_NOT_CONFIGURED");
-        }
-
-        try {
-          const translationMode = settingsState.translationMode || "immersive";
-
-          const systemPrompt =
-            translationMode === "immersive"
-              ? `You are a professional translator working on complete SKILL.md documents.
-
-Return a valid SKILL.md document in ${targetLang}.
-
-Rules:
-1. The input may begin with YAML frontmatter between --- delimiters. Preserve the delimiters, key order, and valid YAML syntax.
-2. In frontmatter, do NOT insert <t>...</t> lines. Keep YAML keys unchanged. Translate only human-readable text values such as description when appropriate. Leave identifiers, slug-like names, versions, URLs, file paths, and code-like values unchanged.
-3. After the frontmatter, translate the markdown body in immersive mode: for each heading, paragraph, or list block, output the original block first, then output the translated block wrapped in <t>...</t>.
-4. Do NOT translate fenced code blocks, inline code, command names, file paths, URLs, or YAML keys.
-5. Preserve markdown structure. Output only the final SKILL.md document with no commentary.
-
-Example input:
----
-name: write
-description: Help users write better.
----
-
-## Overview
-This skill helps you write tests.
-
-Example output:
----
-name: write
-description: 帮助用户更好地写作。
----
-
-## Overview
-<t>## 概述</t>
-This skill helps you write tests.
-<t>此技能帮助你编写测试。</t>`
-              : `You are a professional translator working on complete SKILL.md documents.
-
-Return a valid translated SKILL.md document in ${targetLang}.
-
-Rules:
-1. Preserve YAML frontmatter delimiters, key order, and valid YAML syntax.
-2. Keep YAML keys unchanged. Translate human-readable text values such as description when appropriate, but leave identifiers, slug-like names, versions, URLs, file paths, and code-like values unchanged.
-3. Translate the markdown body fully while preserving markdown structure.
-4. Do NOT translate fenced code blocks, inline code, command names, file paths, URLs, or YAML keys.
-5. Output only the translated SKILL.md document with no commentary.`;
-
-          const result = await chatCompletion(
-            config,
-            [
-              { role: "system", content: systemPrompt },
-              { role: "user", content },
-            ],
-            { temperature: 0.3, maxTokens: 8192 },
-          );
-
-          const translated = result.content;
-          if (translated) {
-            set((state) => {
-              const updated = {
-                ...state.translationCache,
-                [cacheKey]: {
-                  value: translated,
-                  timestamp: Date.now(),
-                  sourceFingerprint,
-                },
-              };
-              return { translationCache: pruneTranslationCache(updated) };
-            });
-            return translated;
-          }
-          return null;
-        } catch (error) {
-          console.error("Translation failed:", error);
-          throw error;
-        }
+        throw new Error("AI_NOT_CONFIGURED");
       },
 
       getTranslationState: (cacheKey, sourceFingerprint) => {

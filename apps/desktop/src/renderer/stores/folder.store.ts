@@ -5,7 +5,6 @@ import type {
   UpdateFolderDTO,
 } from "@prompthub/shared/types";
 import * as db from "../services/database";
-import { scheduleAllSaveSync } from "../services/webdav-save-sync";
 
 interface FolderState {
   folders: Folder[];
@@ -54,7 +53,6 @@ export const useFolderStore = create<FolderState>((set, get) => ({
       order: get().folders.length,
     });
     set((state) => ({ folders: [...state.folders, folder] }));
-    scheduleAllSaveSync("folder:create");
     return folder;
   },
 
@@ -64,7 +62,6 @@ export const useFolderStore = create<FolderState>((set, get) => ({
       set((state) => ({
         folders: state.folders.map((f) => (f.id === id ? updated : f)),
       }));
-      scheduleAllSaveSync("folder:update");
     } catch (error) {
       console.error("Failed to update folder:", error);
     }
@@ -77,7 +74,6 @@ export const useFolderStore = create<FolderState>((set, get) => ({
       selectedFolderId:
         state.selectedFolderId === id ? null : state.selectedFolderId,
     }));
-    scheduleAllSaveSync("folder:delete");
   },
 
   selectFolder: (id) =>
@@ -176,7 +172,6 @@ export const useFolderStore = create<FolderState>((set, get) => ({
       // 6. Persist changes
       await db.updateFolder(id, { parentId: newParentId || undefined });
       await db.updateFolderOrders(orderUpdates);
-      scheduleAllSaveSync("folder:move");
     } catch (error) {
       // 7. Rollback to previous state on failure
       console.error("Failed to move folder:", error);
@@ -200,7 +195,6 @@ export const useFolderStore = create<FolderState>((set, get) => ({
           }),
         };
       });
-      scheduleAllSaveSync("folder:reorder");
     } catch (error) {
       console.error("Failed to reorder folders:", error);
     }

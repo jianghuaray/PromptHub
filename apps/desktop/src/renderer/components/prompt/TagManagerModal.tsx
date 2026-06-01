@@ -9,7 +9,6 @@ import { usePromptStore } from '../../stores/prompt.store';
 import { useSkillStore } from '../../stores/skill.store';
 import { useSettingsStore } from '../../stores/settings.store';
 import { useToast } from '../ui/Toast';
-import { scheduleAllSaveSync } from '../../services/webdav-save-sync';
 import { getExistingSkillTags, getUserSkillTags } from '../skill/skill-modal-utils';
 import { mergePromptTagCatalog } from './prompt-modal-utils';
 
@@ -110,7 +109,6 @@ export function TagManagerModal({
         renamePromptTagCatalogEntry(oldTag, newTag);
         await fetchPrompts();
         await loadPromptTags();
-        scheduleAllSaveSync('tag renamed');
       }
 
       showToast(t('common.success', 'Success'), 'success');
@@ -151,7 +149,6 @@ export function TagManagerModal({
         deletePromptTagCatalogEntry(tag);
         await fetchPrompts();
         await loadPromptTags();
-        scheduleAllSaveSync('tag deleted');
       }
 
       showToast(t('common.success', 'Success'), 'success');

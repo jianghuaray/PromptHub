@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { UnsavedChangesDialog } from "../ui/UnsavedChangesDialog";
 import { useToast } from "../ui/Toast";
-import { scheduleAllSaveSync } from "../../services/webdav-save-sync";
 import "./SkillFileEditor.css";
 
 // ─── Types ──────────────────────────────────────────────
@@ -540,7 +539,6 @@ export function SkillFileEditor({
         return next;
       });
       if (!isPathMode) {
-        scheduleAllSaveSync("skill:file-save");
       }
       showToast(t("skill.fileSaved", "File saved"), "success");
       if (onSave) {
@@ -632,7 +630,6 @@ export function SkillFileEditor({
         [name]: { path: name, content: "", isDirectory: false },
       }));
       if (!isPathMode) {
-        scheduleAllSaveSync("skill:file-create");
       }
     } catch (error) {
       console.error("Failed to create file:", error);
@@ -654,7 +651,6 @@ export function SkillFileEditor({
       setNewFolderDialogOpen(false);
       setDialogInput("");
       if (!isPathMode) {
-        scheduleAllSaveSync("skill:dir-create");
       }
     } catch (error) {
       console.error("Failed to create folder:", error);
@@ -699,7 +695,6 @@ export function SkillFileEditor({
       setRenameDialogPath(null);
       setDialogInput("");
       if (!isPathMode) {
-        scheduleAllSaveSync("skill:path-rename");
       }
       showToast(t("skill.fileSaved", "File saved"), "success");
     } catch (error) {
@@ -738,7 +733,6 @@ export function SkillFileEditor({
         return next;
       });
       if (!isPathMode) {
-        scheduleAllSaveSync("skill:file-delete");
       }
     } catch (error) {
       console.error("Failed to delete file:", error);

@@ -17,7 +17,6 @@ import { Modal } from "../ui";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import type { Skill, SkillVersion } from "@prompthub/shared/types";
 import { generateTextDiff, restoreSkillVersion } from "./detail-utils";
-import { scheduleAllSaveSync } from "../../services/webdav-save-sync";
 import {
   buildVersionFileDiffEntries,
   resolveVersionSnapshots,
@@ -303,7 +302,6 @@ export function SkillVersionHistoryModal({
     setIsDeleting(true);
     try {
       await window.api.skill.versionDelete(skill.id, versionToDelete.id);
-      scheduleAllSaveSync("skill:delete-version");
       setVersionToDelete(null);
       await loadVersions();
     } catch (error) {

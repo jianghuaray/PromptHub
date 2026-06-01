@@ -38,7 +38,6 @@ import type {
 import { SKILL_CATEGORIES } from "@prompthub/shared/constants/skill-registry";
 import {
   formatSkillSafetyScanError,
-  getSafetyScanAIConfig,
 } from "./detail-utils";
 import { findInstalledRegistrySkill } from "../../services/skill-store-update";
 import { filterRegistrySkills } from "../../services/skill-store-search";
@@ -152,7 +151,6 @@ export function SkillStore() {
   const autoScanBeforeInstall = useSettingsStore(
     (state) => state.autoScanStoreSkillsBeforeInstall,
   );
-  const aiModels = useSettingsStore((state) => state.aiModels);
   const installedSlugs = useMemo(() => {
     return skills
       .filter((skill) => skill.registry_slug)
@@ -334,7 +332,6 @@ export function SkillStore() {
           sourceUrl: skill.source_url,
           contentUrl: skill.content_url,
           securityAudits: skill.security_audits,
-          aiConfig: getSafetyScanAIConfig(aiModels),
         });
         const shouldBlockInstall =
           report.level === "blocked" || report.level === "high-risk";

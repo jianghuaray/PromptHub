@@ -26,8 +26,10 @@ explicitly changes direction:
 - Multi-platform Skill distribution: install/deploy/sync Skills into supported
   AI coding tool platforms such as Claude Code, Codex, Cursor, Windsurf,
   Gemini CLI, Kilo Code, and similar configured targets.
-- macOS packaging: keep `pnpm electron:build:mac` working and verify that a
-  `.dmg` can be generated before calling a simplification milestone complete.
+- macOS packaging: keep `pnpm electron:build:mac` working and verify that an
+  Apple Silicon (`arm64`) `.dmg` can be generated before calling a
+  simplification milestone complete. The user does not need Intel (`x64`)
+  packages.
 
 ### Features That Are Not Core For The User
 
@@ -66,8 +68,8 @@ an equally working macOS packaging chain approved by the user.
 
 ### Current Simplification Status
 
-- Stage 1 desktop surface narrowing is in progress/completed for the visible
-  shell:
+- Stage 1/2/3 simplification has been completed for the current desktop
+  package:
   - Default desktop modules are now Prompt and Skill only.
   - Settings now exposes General, Appearance, Data, Skill, and About.
   - Data Settings no longer exposes WebDAV, S3, or self-hosted PromptHub sync
@@ -97,19 +99,30 @@ an equally working macOS packaging chain approved by the user.
     timer, after window resume, or after local Prompt/Folder saves.
   - Desktop main/preload no longer register or expose WebDAV/S3 IPC. The
     unused main-process WebDAV/S3 service files were deleted.
-- Verified during Stage 1 and current Stage 2 renderer cleanup:
+  - Remaining hidden cloud sync renderer services and save-sync scheduler were
+    deleted; local backup/import remains.
+  - Remaining desktop AI IPC/preload/main service files were deleted; Skill
+    safety scan now uses static scanning and returns `scanMethod: "static"`.
+  - `apps/web`, `apps/cli`, and `website` were removed from this local
+    simplified checkout.
+  - Renderer locale assets are now only `zh` and `en`.
+  - Advanced Appearance controls for desktop background image and animation
+    tuning were removed from the UI.
+  - macOS packaging is Apple Silicon only: `electron:build:mac` passes
+    `--arm64`, and `electron-builder.json` only targets `arm64` for DMG/ZIP.
+- Verified during simplification:
   - `pnpm install`
+  - `pnpm install --lockfile-only`
   - `pnpm --filter @prompthub/desktop build`
   - `pnpm --filter @prompthub/desktop typecheck`
-  - `pnpm electron:build:mac`, producing x64 and arm64 `.dmg` files under
-    `apps/desktop/dist/`.
-- Important remaining Stage 2 work:
-  - Delete the remaining hidden WebDAV/S3/self-hosted sync settings and
-    renderer service files after focused checks.
-  - Remove AI IPC/service chains after visible and unreachable AI UI paths are
-    fully gone.
-  - Only remove `apps/web`, `apps/cli`, and `website` after the desktop app
-    still builds cleanly without their shared dependencies.
+  - `pnpm electron:build:mac`, producing
+    `apps/desktop/dist/PromptHub-0.5.7-beta.2-arm64.dmg`.
+- Important remaining cleanup ideas:
+  - Settings store and shared type files still contain some legacy compatibility
+    fields for AI/cloud sync/rules. They are not visible product workflows now,
+    but can be removed in a later deeper cleanup with focused migration checks.
+  - Some old tests still describe removed non-core workflows and should be
+    pruned before relying on the full legacy test suite.
 
 ## 1. Current Repository Shape
 
@@ -119,7 +132,7 @@ some upstream docs.
 - `apps/desktop/`: primary Electron desktop app. This is the simplification
   target and must keep building as a macOS app.
 - `apps/desktop/src/main/`: Electron main process, native integration, IPC
-  registration, data path handling, updater, security, sync, and service logic.
+  registration, data path handling, security, and service logic.
 - `apps/desktop/src/preload/`: context bridge APIs exposed to the renderer.
 - `apps/desktop/src/renderer/`: React UI, Zustand stores, renderer services,
   i18n, Prompt/Skill/Settings/Layout components.
@@ -128,11 +141,9 @@ some upstream docs.
 - `packages/db/`: shared SQLite database layer used by desktop/web/CLI.
 - `packages/core/`: shared core services, including CLI and rules/platform
   helpers.
-- `apps/web/`: self-hosted web product. Non-core for the user's simplified Mac
-  app.
-- `apps/cli/`: standalone CLI product. Non-core for the user's simplified Mac
-  app unless the user later says otherwise.
-- `website/`: public website/docs surface. Non-core for the simplified Mac app.
+- `apps/web/`: removed from this local simplified checkout.
+- `apps/cli/`: removed from this local simplified checkout.
+- `website/`: removed from this local simplified checkout.
 - `spec/`: internal project specs, change records, rules, and knowledge docs.
 - `docs/`: repository-facing documentation and images.
 

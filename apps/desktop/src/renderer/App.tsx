@@ -4,11 +4,7 @@ import { Sidebar, TopBar, MainContent, TitleBar } from "./components/layout";
 import { usePromptStore } from "./stores/prompt.store";
 import { useFolderStore } from "./stores/folder.store";
 import { useSettingsStore } from "./stores/settings.store";
-import {
-  getRenderedBackgroundImageBlur,
-  getRenderedBackgroundImageOpacity,
-  loadSettingsFromMainProcess,
-} from "./stores/settings.store";
+import { loadSettingsFromMainProcess } from "./stores/settings.store";
 import { initDatabase, migrateLegacyIndexedDbToMainProcess } from "./services/database";
 import { ImportedPromptData } from "./components/prompt/ImportPromptModal";
 import { useToast } from "./components/ui/Toast";
@@ -16,7 +12,6 @@ import { DndContext, DragEndEvent, pointerWithin } from "@dnd-kit/core";
 import i18n from "./i18n";
 import { CloseDialog } from "./components/ui/CloseDialog";
 import { DataRecoveryDialog } from "./components/ui/DataRecoveryDialog";
-import { BackgroundImageBackdrop } from "./components/ui/BackgroundImageBackdrop";
 import { BackupImportConfirmDialog } from "./components/settings/BackupImportConfirmDialog";
 import { isWebRuntime } from "./runtime";
 import { useBackupImportController } from "./hooks/useBackupImportController";
@@ -45,18 +40,6 @@ function App() {
   const movePrompts = usePromptStore((state) => state.movePrompts);
   const selectedIds = usePromptStore((state) => state.selectedIds);
   const applyTheme = useSettingsStore((state) => state.applyTheme);
-  const backgroundImageFileName = useSettingsStore(
-    (state) => state.backgroundImageFileName,
-  );
-  const backgroundImageEnabled = useSettingsStore(
-    (state) => state.backgroundImageEnabled,
-  );
-  const backgroundImageOpacity = useSettingsStore(
-    (state) => state.backgroundImageOpacity,
-  );
-  const backgroundImageBlur = useSettingsStore(
-    (state) => state.backgroundImageBlur,
-  );
   const debugMode = useSettingsStore((state) => state.debugMode);
   const shortcutModes = useSettingsStore((state) => state.shortcutModes);
   const [currentPage, setCurrentPage] = useState<PageType>("home");
@@ -89,15 +72,6 @@ function App() {
   // 局部快捷键状态
   const [localShortcuts, setLocalShortcuts] = useState<Record<string, string>>(
     {},
-  );
-  const normalizedBackgroundImageFileName = backgroundImageFileName?.trim();
-  const hasBackgroundImage =
-    !isWebRuntime() &&
-    backgroundImageEnabled &&
-    typeof normalizedBackgroundImageFileName === "string";
-  const renderedBackgroundBlur = getRenderedBackgroundImageBlur(backgroundImageBlur);
-  const renderedBackgroundImageOpacity = getRenderedBackgroundImageOpacity(
-    backgroundImageOpacity,
   );
   const webRuntime = isWebRuntime();
 
@@ -373,33 +347,14 @@ function App() {
     return () => mediaQuery.removeEventListener("change", syncSystemTheme);
   }, []);
 
-  // Mirror motion preference to <html data-motion>. CSS in globals.css
-  // reads this attribute to scale motion durations or disable them
-  // entirely. Initial value comes from the persisted settings store, so
-  // the UI never flashes the wrong motion mode.
-  // 把动画偏好同步到 <html data-motion>。globals.css 通过该属性决定
-  // 整体动画时长缩放或彻底关闭，初值来自持久化的 settings store，避免
-  // 启动时闪现错误状态。
-  useEffect(() => {
-    const apply = (preference: "off" | "reduced" | "standard"): void => {
-      document.documentElement.dataset.motion = preference;
-    };
-    apply(useSettingsStore.getState().motionPreference);
-    return useSettingsStore.subscribe((state, prev) => {
-      if (state.motionPreference !== prev.motionPreference) {
-        apply(state.motionPreference);
-      }
-    });
-  }, []);
-
   useEffect(() => {
     // Apply persisted theme settings
     // 应用保存的主题设置
     applyTheme();
 
-    // Sync language setting: use settings store as the source of truth (zh/zh-TW/en/ja/es/de/fr)
+    // Sync language setting: use settings store as the source of truth (zh/en)
     // i18n reads from the persisted store on init, but we also apply it here as a fallback
-    // 同步语言设置：以 settings store 为准（支持 zh/zh-TW/en/ja/es/de/fr）
+    // 同步语言设置：以 settings store 为准（支持 zh/en）
     // i18n 初始化时会尝试从同一个 persist store 读取语言，但这里再兜底一次，避免初始化顺序导致的覆盖问题
     const languageSettings = useSettingsStore.getState();
     if (
@@ -545,25 +500,8 @@ function App() {
 
   return (
     <DndContext onDragEnd={handleDragEnd} collisionDetection={pointerWithin}>
-      <div
-        className={`relative flex flex-col h-screen bg-background text-foreground overflow-hidden ${
-          hasBackgroundImage ? "app-background-mode-image" : ""
-        }`}
-      >
-        {hasBackgroundImage ? (
-          <BackgroundImageBackdrop
-            src={normalizedBackgroundImageFileName!}
-            alt="App background"
-            opacity={renderedBackgroundImageOpacity}
-            blur={renderedBackgroundBlur}
-          />
-        ) : null}
-
-        <div
-          className={`relative z-10 flex flex-col h-screen overflow-hidden ${
-            hasBackgroundImage ? "app-wallpaper-shell" : ""
-          }`}
-        >
+      <div className="relative flex flex-col h-screen bg-background text-foreground overflow-hidden">
+        <div className="relative z-10 flex flex-col h-screen overflow-hidden">
           {/* Windows title bar */}
           {/* Windows 标题栏 */}
           {!webRuntime && <TitleBar />}

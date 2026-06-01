@@ -42,6 +42,18 @@
 - 移除了桌面端 WebDAV/S3 主进程 IPC 注册、preload 运行时暴露，以及对应的
   主进程服务文件。保留旧类型兼容声明，避免尚未删除的隐藏同步服务代码影响
   编译，但运行时已经没有云同步后端入口。
+- 删除了剩余隐藏云同步 renderer 服务与保存后同步调度，桌面端现在只保留
+  本地手动备份/导入恢复。
+- 删除了剩余桌面 AI preload/main IPC/service 文件，Skill 安全扫描改为静态
+  扫描，不再依赖 AI 配置。
+- 删除了 `apps/web`、`apps/cli` 和 `website`，本地简化版只保留桌面应用及
+  必要共享包。
+- renderer 语言资源只保留简体中文和英文，设置页也只提供这两个语言选项。
+- Appearance 设置移除了桌面背景图和动画强度等高级外观控制，保留主题、
+  颜色、字号和首页模块排序。
+- macOS 打包改为 Apple Silicon (`arm64`) only：`electron:build:mac` 和
+  `electron-builder.json` 不再生成 Intel/x64 产物。
+- 移除了不再使用的 S3 SDK 和 electron-updater 依赖，并更新了 `pnpm-lock.yaml`。
 
 ## Verification
 
@@ -76,16 +88,25 @@
 - `pnpm --filter @prompthub/desktop build` passed after deleting unused
   WebDAV/S3 main-process service files. Main process bundle dropped to about
   266 kB minified in this check.
-- `pnpm electron:build:mac` passed and generated both macOS installer variants:
+- `pnpm --filter @prompthub/desktop typecheck` passed after Stage 3 cloud/AI/
+  locale/appearance/package cleanup.
+- `pnpm --filter @prompthub/desktop build` passed after Stage 3 cleanup.
+- `pnpm electron:build:mac` passed after switching macOS packaging to Apple
+  Silicon only and generated:
   - `apps/desktop/dist/PromptHub-0.5.7-beta.2-arm64.dmg`
-  - `apps/desktop/dist/PromptHub-0.5.7-beta.2-x64.dmg`
+  - `apps/desktop/dist/PromptHub-0.5.7-beta.2-arm64.zip`
+  The old x64 artifacts were removed before the final packaging run.
 
 ## Synced Docs
 
 - `AGENTS.md` now documents the local simplification goal and protected core
   workflows.
+- `AGENTS.md` now records that this simplified checkout packages Apple Silicon
+  (`arm64`) only and that Web/CLI/website have been removed.
 
 ## Follow-ups
 
-- 下一步优先删除 WebDAV/S3/self-hosted 同步的隐藏设置页和 renderer 服务文件，
-  以及 AI 相关的剩余 IPC/服务链路；清理时继续保持桌面构建和 DMG 打包可通过。
+- Settings store 和 shared 类型里仍保留一些 AI/cloud/rules 的兼容字段，主要
+  是为了兼容旧数据和降低一次性迁移风险；后续可以在单独阶段继续删。
+- 旧测试里还有一些针对已移除 Rules/cloud/AI/Web/CLI 工作流的用例；后续如果
+  要恢复完整测试套件，需要先修剪这些测试。

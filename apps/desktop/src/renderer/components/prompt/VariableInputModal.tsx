@@ -2,9 +2,13 @@ import { useState, useEffect, useMemo } from 'react';
 import { Modal, Button } from '../ui';
 import { useTranslation } from 'react-i18next';
 import { CopyIcon, CheckIcon, BracesIcon, HistoryIcon, CalendarIcon, ClockIcon, PlayIcon, Loader2Icon, ImageIcon, XIcon } from 'lucide-react';
-import type { ChatImageAttachment } from '../../services/ai';
 
 type ModalMode = 'copy' | 'aiTest';
+
+interface ChatImageAttachment {
+  mimeType: string;
+  base64: string;
+}
 
 // Output format type for AI test (Issue #38)
 // AI 测试的输出格式类型

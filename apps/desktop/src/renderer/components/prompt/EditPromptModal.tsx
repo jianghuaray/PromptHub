@@ -23,8 +23,6 @@ import {
 import { usePromptStore } from "../../stores/prompt.store";
 import { useFolderStore } from "../../stores/folder.store";
 import { useSettingsStore } from "../../stores/settings.store";
-import { resolveScenarioModel } from "../../services/ai-defaults";
-import { chatCompletion } from "../../services/ai";
 import { useTranslation } from "react-i18next";
 import { useToast } from "../ui/Toast";
 import type {
@@ -43,7 +41,6 @@ import {
   createPromptFormData,
   getExistingPromptTags,
   mergePromptTagCatalog,
-  getLanguageName,
   hasPromptFormChanges,
   isPureEnglish,
   promoteMainEnglishToEnglishVersion,
@@ -91,7 +88,7 @@ export function EditPromptModal({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showEnglishVersion, setShowEnglishVersion] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [isTranslating] = useState(false);
   const [source, setSource] = useState("");
   const [notes, setNotes] = useState("");
   const [showSourceSuggestions, setShowSourceSuggestions] = useState(false);
@@ -103,17 +100,7 @@ export function EditPromptModal({
   // 只订阅需要的字段，而不是整个 store
   const sourceHistory = useSettingsStore((state) => state.sourceHistory);
   const addSourceHistory = useSettingsStore((state) => state.addSourceHistory);
-  const aiModels = useSettingsStore((state) => state.aiModels);
-  const scenarioModelDefaults = useSettingsStore((state) => state.scenarioModelDefaults);
-  const translationModel = useMemo(() => {
-    return resolveScenarioModel(
-      aiModels,
-      scenarioModelDefaults,
-      "translation",
-      "chat",
-    );
-  }, [aiModels, scenarioModelDefaults]);
-  const canTranslate = !!translationModel;
+  const canTranslate = false;
 
   // Detect if main content is pure English (strict: no CJK allowed)
   // 检测主内容是否为纯英文（严格：不允许中日韩字符）
@@ -395,186 +382,14 @@ export function EditPromptModal({
   };
 
   const handleTranslateToEnglish = async () => {
-    if (!canTranslate || !translationModel) {
-      showToast(t("toast.configAI"), "error");
-      return;
-    }
-    if (!systemPrompt && !userPrompt) {
-      showToast(t("prompt.noContentToTranslate"), "error");
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      const systemInstruction =
-        "You are a professional prompt translator. Translate the provided System Prompt and User Prompt into natural, accurate English.\n" +
-        "- Keep original meaning, tone, and intent.\n" +
-        "- Preserve ALL formatting, Markdown, lists, and code blocks.\n" +
-        "- Do NOT translate or alter placeholders like {{variable}}.\n" +
-        "- Do NOT add explanations.\n" +
-        'Return STRICT JSON ONLY: {"systemPromptEn":"...","userPromptEn":"..."}. If systemPrompt is empty, use empty string.';
-
-      const contentToTranslate = JSON.stringify({
-        systemPrompt: systemPrompt || "",
-        userPrompt: userPrompt || "",
-      });
-
-      const result = await chatCompletion(
-        {
-          provider: translationModel.provider,
-          apiProtocol: translationModel.apiProtocol,
-          apiKey: translationModel.apiKey,
-          apiUrl: translationModel.apiUrl,
-          model: translationModel.model,
-        },
-        [
-          { role: "system", content: systemInstruction },
-          { role: "user", content: contentToTranslate },
-        ],
-        { temperature: 0.3, maxTokens: 8192 },
-      );
-
-      if (!result.content) {
-        throw new Error(t("common.error"));
-      }
-
-      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error(t("common.error"));
-      }
-
-      const jsonText = jsonMatch[0];
-      const parsed = JSON.parse(jsonText) as {
-        systemPromptEn?: string;
-        userPromptEn?: string;
-      };
-
-      if (typeof parsed.userPromptEn !== "string") {
-        throw new Error(t("common.error"));
-      }
-
-      if (parsed.systemPromptEn) {
-        setSystemPromptEn(parsed.systemPromptEn);
-      }
-      if (parsed.userPromptEn) {
-        setUserPromptEn(parsed.userPromptEn);
-      }
-
-      setShowEnglishVersion(true);
-      showToast(t("prompt.englishGenerated"), "success");
-    } catch (e) {
-      showToast(
-        e instanceof Error
-          ? e.message
-          : t("common.error"),
-        "error",
-      );
-    } finally {
-      setIsTranslating(false);
-    }
+    showToast(t("toast.configAI"), "error");
   };
 
   // 从英文翻译到当前语言
   // When main content is English (auto-detected), use it as the English source
   // 当主内容被检测为纯英文时，自动将其作为英文源进行翻译
   const handleTranslateFromEnglish = async () => {
-    if (!canTranslate || !translationModel) {
-      showToast(t("toast.configAI"), "error");
-      return;
-    }
-
-    // Determine English source: use En fields if available, otherwise use main content if it's English
-    const englishSystem =
-      systemPromptEn || (isMainContentEnglish ? systemPrompt : "");
-    const englishUser =
-      userPromptEn || (isMainContentEnglish ? userPrompt : "");
-
-    if (!englishSystem && !englishUser) {
-      showToast(
-        t("prompt.noEnglishContentToTranslate"),
-        "error",
-      );
-      return;
-    }
-
-    setIsTranslating(true);
-    try {
-      // If main content is English and En fields are empty, copy main → En fields first
-      if (isMainContentEnglish && !systemPromptEn && !userPromptEn) {
-        if (systemPrompt) setSystemPromptEn(systemPrompt);
-        if (userPrompt) setUserPromptEn(userPrompt);
-      }
-
-      const targetLang = getLanguageName(i18n.language);
-      const instruction =
-        `You are a professional prompt translator. Translate the provided English System Prompt and User Prompt into natural, accurate ${targetLang}.\n` +
-        "- Keep original meaning, tone, and intent.\n" +
-        "- Preserve ALL formatting, Markdown, lists, and code blocks.\n" +
-        "- Do NOT translate or alter placeholders like {{variable}}.\n" +
-        "- Do NOT add explanations.\n" +
-        'Return STRICT JSON ONLY: {"systemPrompt":"...","userPrompt":"..."}. If systemPromptEn is empty, use empty string for systemPrompt.';
-
-      const contentToTranslate = JSON.stringify({
-        systemPromptEn: englishSystem,
-        userPromptEn: englishUser,
-      });
-
-      const result = await chatCompletion(
-        {
-          provider: translationModel.provider,
-          apiProtocol: translationModel.apiProtocol,
-          apiKey: translationModel.apiKey,
-          apiUrl: translationModel.apiUrl,
-          model: translationModel.model,
-        },
-        [
-          { role: "system", content: instruction },
-          { role: "user", content: contentToTranslate },
-        ],
-        { temperature: 0.3, maxTokens: 8192 },
-      );
-
-      if (!result.content) {
-        throw new Error(t("common.error") || "翻译失败");
-      }
-
-      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error(t("common.error") || "翻译结果解析失败");
-      }
-
-      const jsonText = jsonMatch[0];
-      const parsed = JSON.parse(jsonText) as {
-        systemPrompt?: string;
-        userPrompt?: string;
-      };
-
-      if (typeof parsed.userPrompt !== "string") {
-        throw new Error(t("common.error") || "翻译结果解析失败");
-      }
-
-      if (parsed.systemPrompt !== undefined) {
-        setSystemPrompt(parsed.systemPrompt);
-      }
-      if (parsed.userPrompt) {
-        setUserPrompt(parsed.userPrompt);
-      }
-
-      setShowEnglishVersion(true);
-      showToast(
-        t("prompt.localizedGenerated", "已生成当前语言版本"),
-        "success",
-      );
-    } catch (e) {
-      showToast(
-        e instanceof Error
-          ? e.message
-          : t("common.error") || "Translation failed",
-        "error",
-      );
-    } finally {
-      setIsTranslating(false);
-    }
+    showToast(t("toast.configAI"), "error");
   };
 
   const handleToggleEnglishVersion = () => {

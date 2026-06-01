@@ -8,7 +8,6 @@ import type { Plugin } from "vite";
 const mainExternalModules = new Set([
   "node-sqlite3-wasm",
   "electron",
-  "@aws-sdk/client-s3",
 ]);
 
 const aliases = {

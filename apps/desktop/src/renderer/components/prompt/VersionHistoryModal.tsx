@@ -4,7 +4,6 @@ import { Modal } from '../ui';
 import { ClockIcon, RotateCcwIcon, GitCompareIcon, PlusIcon, MinusIcon, SparklesIcon, TrashIcon } from 'lucide-react';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { deletePromptVersion, getPromptVersions } from '../../services/database';
-import { scheduleAllSaveSync } from '../../services/webdav-save-sync';
 import type { Prompt, PromptVersion } from '@prompthub/shared/types';
 
 interface VersionHistoryModalProps {
@@ -261,7 +260,6 @@ export function VersionHistoryModal({ isOpen, onClose, prompt, onRestore }: Vers
     setIsDeleting(true);
     try {
       await deletePromptVersion(versionToDelete.id);
-      scheduleAllSaveSync('prompt:delete-version');
       await loadVersions();
       setVersionToDelete(null);
     } catch (error) {

@@ -36,7 +36,6 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { PlatformIcon } from "../ui/PlatformIcon";
 import { SettingSection, ToggleSwitch } from "./shared";
 import { useToast } from "../ui/Toast";
-import { getSafetyScanAIConfig } from "../skill/detail-utils";
 import { sortSkillPlatformsByPreference } from "../skill/use-skill-platform";
 
 interface ManagedAgentEntry {
@@ -1219,7 +1218,6 @@ export function SkillSafetySettingsSection() {
   const scanInstalledSkillSafety = useSkillStore(
     (state) => state.scanInstalledSkillSafety,
   );
-  const aiModels = settings.aiModels;
   const { showToast } = useToast();
   const [isBatchScanning, setIsBatchScanning] = useState(false);
 
@@ -1300,10 +1298,7 @@ export function SkillSafetySettingsSection() {
                 const run = async () => {
                   setIsBatchScanning(true);
                   try {
-                    const summary = await scanInstalledSkillSafety(
-                      undefined,
-                      getSafetyScanAIConfig(aiModels),
-                    );
+                    const summary = await scanInstalledSkillSafety(undefined);
                     showToast(
                       t("settings.batchScanInstalledSkillsResult", {
                         total: summary.total,

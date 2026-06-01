@@ -314,8 +314,8 @@ export interface SkillSafetyReport {
   recommendedAction: "allow" | "review" | "block";
   scannedAt: number;
   checkedFileCount: number;
-  /** Desktop safety scans are AI-generated. */
-  scanMethod: "ai";
+  /** Simplified desktop safety scans are static; legacy imports may say ai. */
+  scanMethod: "static" | "ai";
   /**
    * Numeric safety score 0-100 (higher = safer).
    * blocked=0-10, high-risk=20-40, warn=50-70, safe=80-100
@@ -324,8 +324,7 @@ export interface SkillSafetyReport {
 }
 
 /**
- * Minimal AI model config passed from renderer to main process
- * for AI-powered safety scanning.
+ * Legacy optional AI model config. Simplified desktop safety scans ignore it.
  */
 export interface SafetyScanAIConfig {
   provider: string;

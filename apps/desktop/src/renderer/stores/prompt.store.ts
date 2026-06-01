@@ -6,7 +6,6 @@ import type {
   UpdatePromptDTO,
 } from "@prompthub/shared/types";
 import * as db from "../services/database";
-import { scheduleAllSaveSync } from "../services/webdav-save-sync";
 
 // Sort method
 // 排序方式
@@ -103,7 +102,6 @@ export const usePromptStore = create<PromptState>()(
           currentVersion: 1,
         });
         set((state) => ({ prompts: [prompt, ...state.prompts] }));
-        scheduleAllSaveSync("prompt:create");
         return prompt;
       },
 
@@ -118,7 +116,6 @@ export const usePromptStore = create<PromptState>()(
           data.isFavorite === undefined &&
           data.isPinned === undefined
         ) {
-          scheduleAllSaveSync("prompt:update");
         }
       },
 
@@ -131,7 +128,6 @@ export const usePromptStore = create<PromptState>()(
               : p,
           ),
         }));
-        scheduleAllSaveSync("prompt:move");
       },
 
       deletePrompt: async (id) => {
@@ -143,7 +139,6 @@ export const usePromptStore = create<PromptState>()(
             (selectedId) => selectedId !== id,
           ),
         }));
-        scheduleAllSaveSync("prompt:delete");
       },
 
       selectPrompt: (id) =>

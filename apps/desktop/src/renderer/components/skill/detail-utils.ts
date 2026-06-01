@@ -1,13 +1,10 @@
 import type { TFunction } from "i18next";
 import type {
-  SafetyScanAIConfig,
   Skill,
   SkillSafetyFinding,
   SkillVersion,
 } from "@prompthub/shared/types";
 import type { SkillPlatform } from "@prompthub/shared/constants/platforms";
-import type { AIModelConfig } from "../../stores/settings.store";
-import { scheduleAllSaveSync } from "../../services/webdav-save-sync";
 
 export const SKILL_NAME_REGEX = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -450,7 +447,6 @@ export async function restoreSkillVersion(
   reloadSkills: () => Promise<void>,
 ): Promise<void> {
   await window.api.skill.versionRollback(skillId, version.version);
-  scheduleAllSaveSync("skill:restore-version");
   await reloadSkills();
 }
 
@@ -621,25 +617,4 @@ export function resolveSkillDescription(instructions?: string): string {
   }
 
   return "";
-}
-
-/**
- * Extract a SafetyScanAIConfig from the user's configured AI models.
- * Returns the default chat model config, or undefined if none is available.
- */
-export function getSafetyScanAIConfig(
-  aiModels: AIModelConfig[],
-): SafetyScanAIConfig | undefined {
-  const chatModels = aiModels.filter((m) => (m.type ?? "chat") === "chat");
-  const model = chatModels.find((m) => m.isDefault) ?? chatModels[0];
-  if (!model?.apiKey || !model?.apiUrl || !model?.model) {
-    return undefined;
-  }
-  return {
-    provider: model.provider,
-    apiProtocol: model.apiProtocol,
-    apiKey: model.apiKey,
-    apiUrl: model.apiUrl,
-    model: model.model,
-  };
 }

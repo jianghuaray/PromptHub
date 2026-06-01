@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ComponentType, SVGProps } from "react";
 import {
   SettingsIcon,
@@ -14,12 +14,10 @@ import {
 import { useTranslation } from "react-i18next";
 import { GeneralSettings } from "./GeneralSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
-import { LanguageSettings } from "./LanguageSettings";
 import { AboutSettings } from "./AboutSettings";
 import { DataSettings } from "./DataSettings";
 import type { DataSettingsSubsectionId } from "./DataSettings";
 import { SkillSettings } from "./SkillSettings";
-import { useSettingsStore } from "../../stores/settings.store";
 import { isWebRuntime } from "../../runtime";
 
 interface BackupImportControllerLike {
@@ -95,12 +93,6 @@ const DATA_SETTINGS_SUBMENU_GROUPS: Array<{
 export function SettingsPage({ onBack, backupImportController }: SettingsPageProps) {
   const webRuntime = isWebRuntime();
   const settingsMenu = webRuntime ? WEB_SETTINGS_MENU : DESKTOP_SETTINGS_MENU;
-  const syncProvider = useSettingsStore((state) => state.syncProvider);
-  const webdavEnabled = useSettingsStore((state) => state.webdavEnabled);
-  const selfHostedSyncEnabled = useSettingsStore(
-    (state) => state.selfHostedSyncEnabled,
-  );
-  const s3StorageEnabled = useSettingsStore((state) => state.s3StorageEnabled);
   const [activeSection, setActiveSection] = useState(
     webRuntime ? "appearance" : "general",
   );
@@ -131,14 +123,6 @@ export function SettingsPage({ onBack, backupImportController }: SettingsPagePro
     !webRuntime && activeSection === "data"
       ? DATA_SETTINGS_SUBMENU_GROUPS
       : null;
-  const enabledSubsections = useMemo(
-    () => ({
-      selfHosted: selfHostedSyncEnabled,
-      webdav: webdavEnabled,
-      s3: s3StorageEnabled,
-    }),
-    [selfHostedSyncEnabled, s3StorageEnabled, webdavEnabled],
-  );
 
   return (
     <div className="flex flex-1 overflow-hidden">
@@ -189,12 +173,7 @@ export function SettingsPage({ onBack, backupImportController }: SettingsPagePro
                   <button
                     key={item.id}
                     onClick={() => setActiveDataSubsection(item.id)}
-                    aria-label={`${t(item.labelKey, item.fallback)}${
-                      item.id in enabledSubsections &&
-                      enabledSubsections[item.id as keyof typeof enabledSubsections]
-                        ? ` ${t("common.enabled")}`
-                        : ""
-                    }`}
+                    aria-label={t(item.labelKey, item.fallback)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all duration-quick ${
                       activeDataSubsection === item.id
                         ? "bg-primary text-white shadow-sm"
@@ -205,27 +184,6 @@ export function SettingsPage({ onBack, backupImportController }: SettingsPagePro
                     <span className="min-w-0 flex-1 text-left">
                       {t(item.labelKey, item.fallback)}
                     </span>
-                    {item.id in enabledSubsections &&
-                    enabledSubsections[
-                      item.id as keyof typeof enabledSubsections
-                    ] ? (
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          syncProvider ===
-                          (item.id === "selfHosted"
-                            ? "self-hosted"
-                            : item.id)
-                            ? activeDataSubsection === item.id
-                              ? "bg-white/20 text-white"
-                              : "bg-primary/10 text-primary"
-                            : activeDataSubsection === item.id
-                              ? "bg-white/15 text-white/90"
-                              : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {t("common.enabled")}
-                      </span>
-                    ) : null}
                   </button>
                 ))}
               </section>

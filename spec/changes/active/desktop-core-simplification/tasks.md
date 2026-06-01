@@ -29,6 +29,16 @@
 - [x] Stage 2: remove WebDAV/S3 main-process IPC registration, preload runtime
   exposure, and unused main-process service files.
 - [x] Verify desktop typecheck/build after WebDAV/S3 backend cleanup.
-- [x] Verify macOS packaging with `pnpm electron:build:mac`.
-- [ ] Plan Stage 3 deletion of unused workspace packages after desktop remains
-  buildable.
+- [x] Stage 3: remove hidden cloud sync renderer services and save-sync
+  scheduler while preserving local backup/import.
+- [x] Stage 3: remove remaining desktop AI preload/main IPC/service files and
+  switch Skill safety checks to static scanning.
+- [x] Stage 3: remove `apps/web`, `apps/cli`, and `website` from the local
+  simplified checkout.
+- [x] Stage 3: keep only Chinese and English renderer locale assets.
+- [x] Stage 3: remove advanced Appearance controls for desktop background image
+  and animation tuning.
+- [x] Stage 3: switch macOS packaging to Apple Silicon (`arm64`) only.
+- [x] Stage 3: remove now-unused S3/updater dependencies and update the lockfile.
+- [x] Verify desktop typecheck/build after Stage 3 cleanup.
+- [x] Verify Apple Silicon macOS packaging with `pnpm electron:build:mac`.

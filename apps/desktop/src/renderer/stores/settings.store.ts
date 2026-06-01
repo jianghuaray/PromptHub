@@ -19,15 +19,7 @@ import {
   normalizeCustomAgents,
 } from "../services/agent-root-paths";
 
-const SUPPORTED_LANGUAGES = [
-  "zh",
-  "zh-TW",
-  "en",
-  "ja",
-  "es",
-  "de",
-  "fr",
-] as const;
+const SUPPORTED_LANGUAGES = ["zh", "en"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 
 const normalizeLanguage = (lang: string): SupportedLanguage => {
@@ -35,12 +27,7 @@ const normalizeLanguage = (lang: string): SupportedLanguage => {
     return lang as SupportedLanguage;
   }
   const lower = (lang || "").toLowerCase();
-  if (lower === "zh-tw" || lower === "zh-hant") return "zh-TW";
   if (lower.startsWith("zh")) return "zh";
-  if (lower.startsWith("ja")) return "ja";
-  if (lower.startsWith("es")) return "es";
-  if (lower.startsWith("de")) return "de";
-  if (lower.startsWith("fr")) return "fr";
   return "en";
 };
 
@@ -539,7 +526,7 @@ interface SettingsState {
   tagFilterMode: TagFilterMode;
   promptTagCatalog: string[];
 
-  language: SupportedLanguage; // zh, zh-TW, en, ja, es, de, fr
+  language: SupportedLanguage; // zh, en
 
   // Data path
   dataPath: string;

@@ -5,7 +5,6 @@ import { registerFolderIPC } from './folder.ipc';
 import { registerSettingsIPC } from './settings.ipc';
 import { registerImageIPC } from './image.ipc';
 import { registerSkillIPC } from './skill.ipc';
-import { registerAIIPC } from './ai.ipc';
 import { PromptDB } from '../database/prompt';
 import { FolderDB } from '../database/folder';
 import { SkillDB } from '../database/skill';
@@ -134,5 +133,4 @@ export function registerAllIPC(
   );
   registerIpcGroup("skill", () => registerSkillIPC(skillDB));
   registerIpcGroup("image", () => registerImageIPC());
-  registerIpcGroup("ai", () => registerAIIPC());
 }
