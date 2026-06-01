@@ -6,7 +6,6 @@ export interface PromptHubRuntimeCapabilities {
   skillFileEditing: boolean;
   skillLocalScan: boolean;
   skillPlatformIntegration: boolean;
-  skillStore: boolean;
 }
 
 export function isWebRuntime(): boolean {
@@ -25,7 +24,6 @@ export function getRuntimeCapabilities(): PromptHubRuntimeCapabilities {
       skillFileEditing: false,
       skillLocalScan: false,
       skillPlatformIntegration: false,
-      skillStore: false,
     };
   }
 
@@ -37,7 +35,6 @@ export function getRuntimeCapabilities(): PromptHubRuntimeCapabilities {
     skillFileEditing: true,
     skillLocalScan: true,
     skillPlatformIntegration: true,
-    skillStore: true,
   };
 }
 

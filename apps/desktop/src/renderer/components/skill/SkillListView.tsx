@@ -263,8 +263,7 @@ export function SkillListView({
 
   if (skills.length === 0) {
     const isDistributionView = storeView === "distribution";
-    const webSkillLibraryMode =
-      !runtimeCapabilities.skillDistribution && !runtimeCapabilities.skillStore;
+    const webSkillLibraryMode = !runtimeCapabilities.skillDistribution;
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground animate-in fade-in zoom-in-95 duration-slow py-20">
         <div className="p-8 bg-accent/30 rounded-full mb-6 relative">
@@ -293,7 +292,7 @@ export function SkillListView({
               ? t("skill.noFavoritesHint", "点击技能卡片上的星标添加收藏")
               : t(
                   "skill.noSkillsHint",
-                  "从 Skill 商店添加、扫描本地环境或手动创建技能开始使用",
+                  "扫描本地环境或手动创建技能开始使用",
                 )}
         </p>
       </div>

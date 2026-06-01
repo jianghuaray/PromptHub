@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo, type CSSProperties } from 'react';
 import type { DragEvent as ReactDragEvent } from 'react';
-import { StarIcon, HashIcon, PlusIcon, LayoutGridIcon, SettingsIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImageIcon, MessageSquareTextIcon, CommandIcon, CuboidIcon, StoreIcon, GlobeIcon, Clock3Icon, FolderPlusIcon, LinkIcon } from 'lucide-react';
+import { StarIcon, HashIcon, PlusIcon, LayoutGridIcon, SettingsIcon, XIcon, ChevronDownIcon, ChevronUpIcon, ImageIcon, MessageSquareTextIcon, CommandIcon, CuboidIcon, GlobeIcon, Clock3Icon, FolderPlusIcon } from 'lucide-react';
 import { useFolderStore } from '../../stores/folder.store';
 import { usePromptStore } from '../../stores/prompt.store';
 import { useSettingsStore } from '../../stores/settings.store';
@@ -15,7 +15,6 @@ import { useSkillStore } from '../../stores/skill.store';
 import { FolderModal, PrivateFolderUnlockModal } from '../folder';
 import { useTranslation } from 'react-i18next';
 import type { Folder } from '@prompthub/shared/types';
-import { BUILTIN_SKILL_REGISTRY } from '@prompthub/shared/constants/skill-registry';
 import { SortableTree } from './tree/SortableTree';
 import type { FlattenedItem } from './tree/utilities';
 import { buildPromptStats } from '../../services/prompt-filter';
@@ -147,7 +146,7 @@ export function Sidebar({ currentPage, onNavigate, layout = 'combined' }: Sideba
     event.dataTransfer.setData('text/plain', tag);
   }, []);
   
-  // Skill store
+  // Skill workspace
   const skills = useSkillStore((state) => state.skills);
   const skillFilterType = useSkillStore((state) => state.filterType);
   const setSkillFilterType = useSkillStore((state) => state.setFilterType);
@@ -155,22 +154,9 @@ export function Sidebar({ currentPage, onNavigate, layout = 'combined' }: Sideba
   const deployedSkillNames = useSkillStore((state) => state.deployedSkillNames);
   const storeView = useSkillStore((state) => state.storeView);
   const setStoreView = useSkillStore((state) => state.setStoreView);
-  const registrySkills = useSkillStore((state) => state.registrySkills);
-  const selectedStoreSourceId = useSkillStore((state) => state.selectedStoreSourceId);
-  const selectStoreSource = useSkillStore((state) => state.selectStoreSource);
-  const customStoreSources = useSkillStore((state) => state.customStoreSources);
-  const remoteStoreEntries = useSkillStore((state) => state.remoteStoreEntries);
   const skillFilterTags = useSkillStore((state) => state.filterTags);
   const toggleSkillFilterTag = useSkillStore((state) => state.toggleFilterTag);
   const clearSkillFilterTags = useSkillStore((state) => state.clearFilterTags);
-  const claudeCodeStoreCount = useMemo(
-    () => remoteStoreEntries['claude-code']?.skills.length || 0,
-    [remoteStoreEntries],
-  );
-  const openAiCodexStoreCount = useMemo(
-    () => remoteStoreEntries['openai-codex']?.skills.length || 0,
-    [remoteStoreEntries],
-  );
   const [showAllSkillTags, setShowAllSkillTags] = useState(false);
   const promptStats = useMemo(() => buildPromptStats(prompts), [prompts]);
   const skillStats = useMemo(
@@ -946,126 +932,6 @@ export function Sidebar({ currentPage, onNavigate, layout = 'combined' }: Sideba
                     }}
                   />
               </>
-            )}
-            {runtimeCapabilities.skillStore && (
-              <>
-                <div className="h-px app-wallpaper-panel-strong-border/50 my-2" />
-                <NavItem
-                  icon={<StoreIcon className="w-5 h-5" />}
-                  label={t('nav.skillStore', 'Skill 商店')}
-                  active={storeView === 'store' && currentPage === 'home'}
-                  collapsed={isCollapsed}
-                   onClick={() => {
-                     if (!confirmLeaveDirtySkillEditor()) return;
-                     setStoreView('store');
-                     selectSkill(null);
-                     selectStoreSource(selectedStoreSourceId || 'official');
-                     if (currentPage !== 'home') onNavigate('home');
-                   }}
-                />
-              </>
-            )}
-            {runtimeCapabilities.skillStore && storeView === 'store' && !isCollapsed && (
-              <div className="ml-4 pl-3 mt-1 border-l border-sidebar-border/50 space-y-1">
-                <button
-                  onClick={() => {
-                    selectStoreSource('official');
-                    if (currentPage !== 'home') onNavigate('home');
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedStoreSourceId === 'official'
-                      ? 'bg-sidebar-accent text-sidebar-foreground'
-                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
-                  }`}
-                >
-                  <StoreIcon className="w-4 h-4" />
-                  <span className="flex-1 text-left truncate">
-                    {t('skill.officialStore', '官方商店')}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sidebar-accent/80 text-sidebar-foreground/50 border border-white/5">
-                    {BUILTIN_SKILL_REGISTRY.length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    selectStoreSource('claude-code');
-                    if (currentPage !== 'home') onNavigate('home');
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedStoreSourceId === 'claude-code'
-                      ? 'bg-sidebar-accent text-sidebar-foreground'
-                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
-                  }`}
-                >
-                  <GlobeIcon className="w-4 h-4" />
-                  <span className="flex-1 text-left truncate">
-                    {t('skill.claudeCodeStore', 'Claude Code 商店')}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sidebar-accent/80 text-sidebar-foreground/50 border border-white/5">
-                    {claudeCodeStoreCount}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    selectStoreSource('openai-codex');
-                    if (currentPage !== 'home') onNavigate('home');
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                    selectedStoreSourceId === 'openai-codex'
-                      ? 'bg-sidebar-accent text-sidebar-foreground'
-                      : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
-                  }`}
-                >
-                  <GlobeIcon className="w-4 h-4" />
-                  <span className="flex-1 text-left truncate">
-                    {t('skill.openaiCodexStore', 'OpenAI Codex 商店')}
-                  </span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sidebar-accent/80 text-sidebar-foreground/50 border border-white/5">
-                    {openAiCodexStoreCount}
-                  </span>
-                </button>
-                {customStoreSources.map((source) => (
-                  <button
-                    key={source.id}
-                    onClick={() => {
-                      selectStoreSource(source.id);
-                      if (currentPage !== 'home') onNavigate('home');
-                    }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      selectedStoreSourceId === source.id
-                        ? 'bg-sidebar-accent text-sidebar-foreground'
-                        : 'text-sidebar-foreground/60 hover:bg-sidebar-accent/40 hover:text-sidebar-foreground'
-                    }`}
-                  >
-                    <LinkIcon className="w-4 h-4" />
-                    <span className="flex-1 text-left truncate">{source.name}</span>
-                    {remoteStoreEntries[source.id]?.skills.length ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-sidebar-accent/80 text-sidebar-foreground/50 border border-white/5">
-                        {remoteStoreEntries[source.id]?.skills.length}
-                      </span>
-                    ) : null}
-                    {!source.enabled && (
-                      <span className="text-[10px] text-sidebar-foreground/40">
-                        {t('common.disabled', '停用')}
-                      </span>
-                    )}
-                  </button>
-                ))}
-                <button
-                  onClick={() => {
-                    selectStoreSource('new-custom');
-                    if (currentPage !== 'home') onNavigate('home');
-                  }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed text-sm transition-colors ${
-                    selectedStoreSourceId === 'new-custom'
-                      ? 'border-primary text-primary bg-primary/5'
-                      : 'border-sidebar-border/70 text-sidebar-foreground/50 hover:border-primary/50 hover:text-sidebar-foreground hover:bg-sidebar-accent/20'
-                  }`}
-                >
-                  <PlusIcon className="w-4 h-4" />
-                  <span className="truncate">{t('skill.addStoreSource', '添加商店')}</span>
-                </button>
-              </div>
             )}
           </div>
         </div>

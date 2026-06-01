@@ -32,7 +32,6 @@ import {
   filterVisibleScannedSkills,
   filterVisibleSkills,
 } from "../../services/skill-filter";
-import { filterRegistrySkills } from "../../services/skill-store-search";
 import {
   isWebRuntime,
   logoutWebSession,
@@ -67,25 +66,14 @@ export function TopBar(_props: TopBarProps) {
   // Skill store
   const skillSearchQuery = useSkillStore((state) => state.searchQuery);
   const setSkillSearchQuery = useSkillStore((state) => state.setSearchQuery);
-  const skillStoreSearchQuery = useSkillStore((state) => state.storeSearchQuery);
-  const setSkillStoreSearchQuery = useSkillStore(
-    (state) => state.setStoreSearchQuery,
-  );
   const skills = useSkillStore((state) => state.skills);
   const skillFilterType = useSkillStore((state) => state.filterType);
   const skillFilterTags = useSkillStore((state) => state.filterTags);
   const deployedSkillNames = useSkillStore((state) => state.deployedSkillNames);
   const skillStoreView = useSkillStore((state) => state.storeView);
-  const skillStoreCategory = useSkillStore((state) => state.storeCategory);
-  const registrySkills = useSkillStore((state) => state.registrySkills);
-  const selectedStoreSourceId = useSkillStore(
-    (state) => state.selectedStoreSourceId,
-  );
-  const remoteStoreEntries = useSkillStore((state) => state.remoteStoreEntries);
   const selectedProjectId = useSkillStore((state) => state.selectedProjectId);
   const projectScanState = useSkillStore((state) => state.projectScanState);
   const selectSkill = useSkillStore((state) => state.selectSkill);
-  const selectRegistrySkill = useSkillStore((state) => state.selectRegistrySkill);
 
   const isDarkMode = useSettingsStore((state) => state.isDarkMode);
   const setDarkMode = useSettingsStore((state) => state.setDarkMode);
@@ -103,26 +91,18 @@ export function TopBar(_props: TopBarProps) {
   const webRuntime = isWebRuntime();
   const isProjectSkillView =
     appModule === "skill" && skillStoreView === "projects";
-  const isSkillStoreCatalogView =
-    appModule === "skill" && skillStoreView === "store";
   const isSkillView = appModule === "skill";
   const isPromptView = appModule === "prompt";
 
   // Unified search query based on mode
   const searchQuery = isSkillView
-    ? isSkillStoreCatalogView
-      ? skillStoreSearchQuery
-      : skillSearchQuery
+    ? skillSearchQuery
     : isPromptView
       ? promptSearchQuery
       : "";
-  const deferredSkillSearchQuery = useDeferredValue(
-    isSkillStoreCatalogView ? skillStoreSearchQuery : skillSearchQuery,
-  );
+  const deferredSkillSearchQuery = useDeferredValue(skillSearchQuery);
   const setSearchQuery = isSkillView
-    ? isSkillStoreCatalogView
-      ? setSkillStoreSearchQuery
-      : setSkillSearchQuery
+    ? setSkillSearchQuery
     : isPromptView
       ? setPromptSearchQuery
       : () => undefined;
@@ -242,35 +222,12 @@ export function TopBar(_props: TopBarProps) {
     selectedProjectId,
   ]);
 
-  const storeSearchResults = useMemo(() => {
-    if (!isSkillStoreCatalogView) return [];
-
-    const sourceSkills =
-      selectedStoreSourceId === "official"
-        ? registrySkills
-        : remoteStoreEntries[selectedStoreSourceId]?.skills || [];
-
-    return filterRegistrySkills(sourceSkills, {
-      category: skillStoreCategory,
-      searchQuery: deferredSkillSearchQuery,
-    });
-  }, [
-    deferredSkillSearchQuery,
-    isSkillStoreCatalogView,
-    registrySkills,
-    remoteStoreEntries,
-    selectedStoreSourceId,
-    skillStoreCategory,
-  ]);
-
   // 根据模式选择搜索结果
   const searchResults =
     isSkillView
         ? isProjectSkillView
           ? projectSearchResults
-          : isSkillStoreCatalogView
-            ? storeSearchResults
-            : skillSearchResults
+          : skillSearchResults
       : promptSearchResults;
   const searchResultCount = searchResults.length;
   const showSearchNavigation = !isSkillView && !isProjectSkillView;
@@ -293,13 +250,6 @@ export function TopBar(_props: TopBarProps) {
         if (isProjectSkillView) {
           return;
         }
-        if (isSkillStoreCatalogView) {
-          const registryResults = storeSearchResults;
-          if (registryResults[newIndex]) {
-            selectRegistrySkill(registryResults[newIndex].slug);
-          }
-          return;
-        }
         const skillResults = skillSearchResults;
         if (skillResults[newIndex]) {
           selectSkill(skillResults[newIndex].id);
@@ -315,12 +265,9 @@ export function TopBar(_props: TopBarProps) {
       searchResultCount,
       currentResultIndex,
       isProjectSkillView,
-      isSkillStoreCatalogView,
       isSkillView,
       selectPrompt,
-      selectRegistrySkill,
       selectSkill,
-      storeSearchResults,
       skillSearchResults,
       promptSearchResults,
     ],
@@ -370,11 +317,7 @@ export function TopBar(_props: TopBarProps) {
       }
       // Enter 确认选择当前结果
       if (isSkillView) {
-        if (isSkillStoreCatalogView) {
-          if (storeSearchResults[currentResultIndex]) {
-            selectRegistrySkill(storeSearchResults[currentResultIndex].slug);
-          }
-        } else if (skillSearchResults[currentResultIndex]) {
+        if (skillSearchResults[currentResultIndex]) {
           selectSkill(skillSearchResults[currentResultIndex].id);
         }
       } else {
@@ -515,8 +458,6 @@ export function TopBar(_props: TopBarProps) {
                   appModule === "skill"
                     ? isProjectSkillView
                       ? t("header.searchProjectSkills", "Search project skills...")
-                      : isSkillStoreCatalogView
-                        ? t("skill.searchStore", "Search skills...")
                       : t("header.searchSkill", "Search skills...")
                     : t("header.search")
                 }

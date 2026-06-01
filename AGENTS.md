@@ -108,6 +108,9 @@ an equally working macOS packaging chain approved by the user.
   - Renderer locale assets are now only `zh` and `en`.
   - Advanced Appearance controls for desktop background image and animation
     tuning were removed from the UI.
+  - Skill 商店模块已从桌面 UI 中移除，包括侧边栏商店入口、商店页面、
+    商店内搜索、远程商店刷新组件和对应商店页面组件文件。保留我的 Skills、
+    Projects 本地扫描、已分发/待分发和平台分发能力。
   - macOS packaging is Apple Silicon only: `electron:build:mac` passes
     `--arm64`, and `electron-builder.json` only targets `arm64` for DMG/ZIP.
 - Verified during simplification:

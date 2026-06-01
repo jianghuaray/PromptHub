@@ -38,6 +38,8 @@
 - [x] Stage 3: keep only Chinese and English renderer locale assets.
 - [x] Stage 3: remove advanced Appearance controls for desktop background image
   and animation tuning.
+- [x] Stage 3: remove the Skill Store desktop module while keeping local Skill
+  management, local scanning, and platform distribution.
 - [x] Stage 3: switch macOS packaging to Apple Silicon (`arm64`) only.
 - [x] Stage 3: remove now-unused S3/updater dependencies and update the lockfile.
 - [x] Verify desktop typecheck/build after Stage 3 cleanup.

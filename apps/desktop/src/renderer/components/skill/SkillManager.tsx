@@ -33,7 +33,6 @@ import type { Skill, ScannedSkill } from "@prompthub/shared/types";
 import { updateSkillTags, type SkillBatchTagMode } from "./batch-utils";
 import { filterVisibleSkills } from "../../services/skill-filter";
 import { getRuntimeCapabilities } from "../../runtime";
-import { useSkillStoreRemoteSync } from "./store-remote-sync";
 import { deriveSkillScanPathsFromCustomAgents } from "../../services/agent-root-paths";
 
 const MAX_STAGGERED_CARDS = 10;
@@ -52,9 +51,6 @@ const SkillFullDetailPage = lazy(() =>
   import("./SkillFullDetailPage").then((m) => ({
     default: m.SkillFullDetailPage,
   })),
-);
-const SkillStore = lazy(() =>
-  import("./SkillStore").then((m) => ({ default: m.SkillStore })),
 );
 const SkillProjectsView = lazy(() =>
   import("./SkillProjectsView").then((m) => ({ default: m.SkillProjectsView })),
@@ -121,8 +117,7 @@ export function SkillManager() {
     (state) => state.customAgents,
   );
   const runtimeCapabilities = getRuntimeCapabilities();
-  const webSkillLibraryMode =
-    !runtimeCapabilities.skillDistribution && !runtimeCapabilities.skillStore;
+  const webSkillLibraryMode = !runtimeCapabilities.skillDistribution;
   const effectiveStoreView = webSkillLibraryMode ? "my-skills" : storeView;
   const effectiveFilterType =
     webSkillLibraryMode &&
@@ -176,45 +171,11 @@ export function SkillManager() {
   const [selectedSkillIds, setSelectedSkillIds] = useState<Set<string>>(
     new Set(),
   );
-  const { remoteStoreEntries } = useSkillStoreRemoteSync({
-    eagerRemoteSources: "all",
-  });
-
   const scanLocalPreview = useSkillStore((state) => state.scanLocalPreview);
   const importScannedSkills = useSkillStore(
     (state) => state.importScannedSkills,
   );
-  const skillsWithStoreUpdates = useMemo(() => {
-    const registrySkillBySlug = new Map(
-      Object.values(remoteStoreEntries)
-        .flatMap((entry) => entry.skills)
-        .map((skill) => [skill.slug, skill]),
-    );
-
-    return new Set(
-      skills
-        .filter((skill) => {
-          if (!skill.registry_slug) {
-            return false;
-          }
-
-          const registrySkill = registrySkillBySlug.get(skill.registry_slug);
-          if (!registrySkill) {
-            return false;
-          }
-
-          if (skill.installed_content_hash) {
-            return skill.installed_version !== registrySkill.version;
-          }
-
-          const installedVersion = skill.installed_version ?? skill.version;
-          return Boolean(
-            installedVersion && installedVersion !== registrySkill.version,
-          );
-        })
-        .map((skill) => skill.id),
-    );
-  }, [remoteStoreEntries, skills]);
+  const skillsWithStoreUpdates = useMemo(() => new Set<string>(), []);
 
   // Delete confirmation dialog state
   // 删除确认对话框状态
@@ -349,6 +310,12 @@ export function SkillManager() {
   }, [filterType, setFilterType, setStoreView, storeView, webSkillLibraryMode]);
 
   useEffect(() => {
+    if (storeView === "store") {
+      setStoreView("my-skills");
+    }
+  }, [setStoreView, storeView]);
+
+  useEffect(() => {
     let disposed = false;
     let idleId: number | undefined;
     let timeoutId: number | undefined;
@@ -449,22 +416,6 @@ export function SkillManager() {
       setSelectedSkillIds((prev) => (prev.size === 0 ? prev : new Set()));
     }
   }, [storeView]);
-
-  // Store view: show the skill store page
-  // 商店视图：显示技能商店页面
-  if (runtimeCapabilities.skillStore && effectiveStoreView === "store") {
-    return (
-      <Suspense
-        fallback={
-          <div className="flex h-full items-center justify-center">
-            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        }
-      >
-        <SkillStore />
-      </Suspense>
-    );
-  }
 
   if (runtimeCapabilities.skillLocalScan && effectiveStoreView === "projects") {
     return (

@@ -51,6 +51,10 @@
 - renderer 语言资源只保留简体中文和英文，设置页也只提供这两个语言选项。
 - Appearance 设置移除了桌面背景图和动画强度等高级外观控制，保留主题、
   颜色、字号和首页模块排序。
+- Skill 商店模块已从桌面 UI 中移除：侧边栏不再显示 Skill 商店入口，TopBar
+  不再处理商店搜索，SkillManager 不再懒加载商店页面，远程商店刷新 hook 和
+  商店页面组件文件已删除。我的 Skills、Projects 本地扫描、已分发/待分发
+  和平台分发仍保留。
 - macOS 打包改为 Apple Silicon (`arm64`) only：`electron:build:mac` 和
   `electron-builder.json` 不再生成 Intel/x64 产物。
 - 移除了不再使用的 S3 SDK 和 electron-updater 依赖，并更新了 `pnpm-lock.yaml`。
@@ -91,6 +95,10 @@
 - `pnpm --filter @prompthub/desktop typecheck` passed after Stage 3 cloud/AI/
   locale/appearance/package cleanup.
 - `pnpm --filter @prompthub/desktop build` passed after Stage 3 cleanup.
+- `pnpm --filter @prompthub/desktop typecheck` passed after removing the Skill
+  Store module.
+- `pnpm --filter @prompthub/desktop build` passed after removing the Skill Store
+  module; the renderer output no longer emits a `SkillStore` page chunk.
 - `pnpm electron:build:mac` passed after switching macOS packaging to Apple
   Silicon only and generated:
   - `apps/desktop/dist/PromptHub-0.5.7-beta.2-arm64.dmg`
